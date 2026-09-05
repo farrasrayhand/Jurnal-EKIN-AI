@@ -3,16 +3,15 @@
     {
       "id": "usr-superadmin",
       "username": "superadmin",
-      "password": "scrypt:7544983c6d5ab4d7c2e7361287ec35a9:40cef4acdf950c513c4385a4860087561e06b9c2c677bd2a1fee81a087bf830402f7cc7447c72be4785f4da4bb88e1269d06f45493a04933135a0e75e1a89818",
+      "password": "admin123",
       "role": "superadmin",
       "nama": "Super Administrator",
-      "nip": "-",
-      "pangkat": "Pembina Tk. I / IV/b",
-      "jabatan": "Kepala Laboratorium TI",
-      "unitKerja": "Balai Teknologi Informasi Pendidikan",
+      "nip": "198001012005011001",
+      "pangkat": "Pembina Tingkat I / IV/b",
+      "jabatan": "Administrator Sistem Kepegawaian",
+      "unitKerja": "DINAS PENDIDIKAN DAN KEBUDAYAAN",
       "allowEnvKey": true,
-      "createdAt": "2026-01-01T00:00:00.000Z",
-      "updatedAt": "2026-09-05T07:51:30.495Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     {
       "id": "usr-farras",
@@ -42,18 +41,6 @@
     }
   ],
   "journals": [
-    {
-      "id": "jrn-1788586761671",
-      "createdAt": "2026-09-05T05:39:21.671Z",
-      "userId": "usr-farras",
-      "tanggal": "2026-07-20",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi penanganan kendala konektivitas jaringan internet ruang guru yg mati serta setting mikrotik lab.",
-      "aktivitasKasaran": "tadi benerin wifi",
-      "outputJumlah": "1 Berkas Berita Acara Perbaikan",
-      "catatan": "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.",
-      "source": "telegram"
-    },
     {
       "id": "jrn-smk-01",
       "userId": "usr-farras",
@@ -86,73 +73,6 @@
       "outputJumlah": "1 Dokumen Notula & Daftar Hadir",
       "catatan": "Laporan presensi dan notula telah divalidasi pimpinan.",
       "linkUrl": "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz"
-    },
-    {
-      "id": "jrn-1788593068708",
-      "createdAt": "2026-09-05T07:24:28.708Z",
-      "userId": "usr-farras",
-      "tanggal": "2026-09-05",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan verifikasi spj dan simpan bukti di.",
-      "aktivitasKasaran": "hari ini verifikasi spj dan simpan bukti di",
-      "outputJumlah": "1 Laporan Pelaksanaan Tugas",
-      "catatan": "Kegiatan terselesaikan dengan tertib dan memenuhi standar pelayanan.",
-      "linkUrl": "https://drive.google.com/file/d/abc789/view",
-      "source": "telegram",
-      "aiEngine": "offline-heuristics"
-    },
-    {
-      "id": "jrn-1788593099527",
-      "createdAt": "2026-09-05T07:24:59.527Z",
-      "userId": "usr-farras",
-      "tanggal": "2026-07-20",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi penanganan kendala konektivitas jaringan internet ruang guru yg mati serta setting mikrotik lab.",
-      "aktivitasKasaran": "tadi benerin wifi",
-      "outputJumlah": "1 Berkas Berita Acara Perbaikan",
-      "catatan": "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.",
-      "source": "telegram"
-    },
-    {
-      "id": "jrn-1788593097980",
-      "createdAt": "2026-09-05T07:24:57.980Z",
-      "userId": "usr-farras",
-      "tanggal": "2026-09-05",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan verifikasi spj dan simpan bukti di.",
-      "aktivitasKasaran": "hari ini verifikasi spj dan simpan bukti di",
-      "outputJumlah": "1 Laporan Pelaksanaan Tugas",
-      "catatan": "Kegiatan terselesaikan dengan tertib dan memenuhi standar pelayanan.",
-      "linkUrl": "https://drive.google.com/file/d/abc789/view",
-      "source": "telegram",
-      "aiEngine": "offline-heuristics"
-    },
-    {
-      "id": "jrn-1788593087433",
-      "createdAt": "2026-09-05T07:24:47.433Z",
-      "userId": "usr-farras",
-      "tanggal": "2026-09-05",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan verifikasi spj dan simpan bukti di.",
-      "aktivitasKasaran": "hari ini verifikasi spj dan simpan bukti di",
-      "outputJumlah": "1 Laporan Pelaksanaan Tugas",
-      "catatan": "Kegiatan terselesaikan dengan tertib dan memenuhi standar pelayanan.",
-      "linkUrl": "https://drive.google.com/file/d/abc789/view",
-      "source": "telegram",
-      "aiEngine": "offline-heuristics"
-    },
-    {
-      "id": "jrn-1788590787147",
-      "createdAt": "2026-09-05T06:46:27.147Z",
-      "userId": "usr-test-incomplete",
-      "tanggal": "2026-09-05",
-      "jam": "08:00 - 16:00",
-      "aktivitas": "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi penanganan kendala konektivitas jaringan internet guru yg mati dan cek mikrotik lab.",
-      "aktivitasKasaran": "tadi benerin wifi guru yg mati dan cek mikrotik lab",
-      "outputJumlah": "1 Berkas Berita Acara Perbaikan",
-      "catatan": "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.",
-      "source": "telegram",
-      "aiEngine": "offline-heuristics"
     }
   ],
   "telegramSessions": {},
@@ -166,7 +86,7 @@
   "settings": {
     "gdriveLink": ""
   },
-  "updatedAt": "2026-09-05T08:22:17.457Z",
+  "updatedAt": "2026-09-05T08:27:55.714Z",
   "registrationCodes": [],
   "webSessions": {}
 }

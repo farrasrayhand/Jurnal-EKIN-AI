@@ -271,6 +271,16 @@ function ensureDb() {
 }
 
 /**
+ * Menyetel cached store dari luar (misal dari hasil load MySQL)
+ */
+export function setCachedStore(store) {
+  if (store && typeof store === "object") {
+    cachedStore = store;
+    store.updatedAt = new Date().toISOString();
+  }
+}
+
+/**
  * Mengambil seluruh objek store (dengan cache memori cepat)
  */
 export function getStore() {
@@ -288,6 +298,12 @@ export function saveStore(store) {
   try {
     lastReadMtime = fs.statSync(DB_FILE).mtimeMs;
   } catch (e) {}
+
+  // Sinkronkan ke database MySQL jika dikonfigurasi (background async)
+  import("./mysqlAdapter.js")
+    .then(m => m.syncStoreToMysql(store))
+    .catch(() => {});
+
   return store;
 }
 

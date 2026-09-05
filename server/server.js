@@ -52,6 +52,7 @@ const MIME_TYPES = {
 import { 
   getStore,
   saveStore,
+  setCachedStore,
   authenticateUser, 
   sanitizeUser, 
   hashPassword,
@@ -68,6 +69,7 @@ import {
   ONE_DAY_MS
 } from "./dbStore.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
+import { initMysqlDatabase, loadStoreFromMysql, getMysqlConfig } from "./mysqlAdapter.js";
 
 // Rate Limiter Sederhana In-Memory untuk Cegah Brute-Force & DoS
 const rateLimitMap = new Map();
@@ -1005,18 +1007,46 @@ const server = http.createServer((req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`
+async function startServer() {
+  const mysqlConfig = getMysqlConfig();
+  let dbStatus = "Penyimpanan Berkas JSON Lokal (database/ekinerja_store.json)";
+
+  if (mysqlConfig) {
+    try {
+      const mysqlInit = await initMysqlDatabase();
+      if (mysqlInit.enabled) {
+        dbStatus = `MySQL / MariaDB (${mysqlConfig.database} @ ${mysqlConfig.host}:${mysqlConfig.port}) - Aktif & Seeder Terpasang`;
+        const mysqlStore = await loadStoreFromMysql();
+        if (mysqlStore) {
+          setCachedStore(mysqlStore);
+          try {
+            fs.writeFileSync(DB_FILE, JSON.stringify(mysqlStore, null, 2), "utf8");
+          } catch (e) {}
+        }
+      } else {
+        dbStatus = `MySQL Fallback (${mysqlInit.error || "offline"}), aktif di JSON lokal`;
+      }
+    } catch (e) {
+      dbStatus = `MySQL Gagal (${e.message}), aktif di JSON lokal`;
+    }
+  }
+
+  server.listen(PORT, HOST, () => {
+    console.log(`
 ========================================================================
 🚀 [EASYPANEL / PRODUCTION SERVER] E-KINERJA AI AKTIF!
 ========================================================================
-🌐 Web App Port  : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}
-📊 API Sync Path : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/api/sync
-🩺 Health Check  : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/health
-🤖 Telegram Bot  : ${process.env.TELEGRAM_BOT_TOKEN ? "Aktif Otomatis (Polling Siap)" : "Standby (Menunggu Token di Environment Easypanel)"}
+🌐 Web App Port   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}
+📊 API Sync Path  : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/api/sync
+🗄️ Database Mode  : ${dbStatus}
+🩺 Health Check   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/health
+🤖 Telegram Bot   : ${process.env.TELEGRAM_BOT_TOKEN ? "Aktif Otomatis (Polling Siap)" : "Standby (Menunggu Token di Environment Easypanel)"}
 ========================================================================
 `);
-});
+  });
+}
+
+startServer();
 
 // Penanganan Graceful Shutdown
 process.on("SIGTERM", () => {
