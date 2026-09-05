@@ -1151,12 +1151,20 @@ async function startServer() {
 startServer();
 
 // Penanganan Graceful Shutdown
-process.on("SIGTERM", () => {
-  console.log("Menerima sinyal SIGTERM, menutup server...");
+process.on("SIGTERM", async () => {
+  console.log("Menerima sinyal SIGTERM, menutup server & koneksi database...");
+  try {
+    const { closePool } = await import("./mysqlAdapter.js");
+    await closePool();
+  } catch (e) {}
   server.close(() => process.exit(0));
 });
 
-process.on("SIGINT", () => {
-  console.log("Menerima sinyal SIGINT, menutup server...");
+process.on("SIGINT", async () => {
+  console.log("Menerima sinyal SIGINT, menutup server & koneksi database...");
+  try {
+    const { closePool } = await import("./mysqlAdapter.js");
+    await closePool();
+  } catch (e) {}
   server.close(() => process.exit(0));
 });

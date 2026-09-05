@@ -29,6 +29,10 @@ export function getMysqlConfig() {
         database: u.pathname.replace(/^\//, "") || "db_ekin",
         waitForConnections: true,
         connectionLimit: 10,
+        maxIdle: 5,
+        idleTimeout: 60000,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10000,
         queueLimit: 0,
         connectTimeout: 10000
       };
@@ -45,9 +49,31 @@ export function getMysqlConfig() {
     database: process.env.DB_NAME || process.env.VITE_DB_NAME || "db_ekin",
     waitForConnections: true,
     connectionLimit: 10,
+    maxIdle: 5,
+    idleTimeout: 60000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
     queueLimit: 0,
     connectTimeout: 10000
   };
+}
+
+let heartbeatTimer = null;
+
+/**
+ * Memulai ping berkala (heartbeat) setiap 45 detik agar koneksi idle di jaringan virtual Docker/Easypanel tidak ditutup sepihak
+ */
+function startHeartbeat(pool) {
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(async () => {
+    if (!poolInstance) return;
+    try {
+      await poolInstance.query("SELECT 1");
+    } catch (e) {
+      // Abaikan jika ada kegagalan sesaat, pool akan reconnect otomatis
+    }
+  }, 45000);
+  if (heartbeatTimer.unref) heartbeatTimer.unref();
 }
 
 /**
@@ -59,8 +85,28 @@ export function getPool() {
 
   if (!poolInstance) {
     poolInstance = mysql.createPool(config);
+    startHeartbeat(poolInstance);
   }
   return poolInstance;
+}
+
+/**
+ * Menutup seluruh koneksi di pool secara bersih saat proses dimatikan (Graceful Shutdown)
+ */
+export async function closePool() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (poolInstance) {
+    try {
+      await poolInstance.end();
+      console.log("[MySQL] Connection pool ditutup dengan aman.");
+    } catch (e) {
+      console.warn("[MySQL] Error saat menutup pool:", e.message);
+    }
+    poolInstance = null;
+  }
 }
 
 /**
