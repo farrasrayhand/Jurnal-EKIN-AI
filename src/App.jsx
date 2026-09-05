@@ -187,27 +187,6 @@ export default function App() {
     }
   };
 
-  const [penilai, setPenilai] = useState(() => {
-    try {
-      const saved = localStorage.getItem("laporan_penilai");
-      return saved ? JSON.parse(saved) : {
-        nama: "ANDA SUPANDA, S.Pd, M.Pd",
-        nip: "197505201998021001",
-        pangkat: "Pembina Tingkat I / IV/b",
-        jabatan: "Kepala Sekolah",
-        unitKerja: "SMK N 07 SAMARINDA"
-      };
-    } catch (e) {
-      return {
-        nama: "ANDA SUPANDA, S.Pd, M.Pd",
-        nip: "197505201998021001",
-        pangkat: "Pembina Tingkat I / IV/b",
-        jabatan: "Kepala Sekolah",
-        unitKerja: "SMK N 07 SAMARINDA"
-      };
-    }
-  });
-
   const [periode, setPeriode] = useState({
     mulai: "1 Januari 2026",
     selesai: "31 Desember 2026"
@@ -222,9 +201,8 @@ export default function App() {
   useEffect(() => {
     try {
       localStorage.setItem("laporan_pegawai", JSON.stringify(pegawai));
-      localStorage.setItem("laporan_penilai", JSON.stringify(penilai));
     } catch (e) {}
-  }, [pegawai, penilai]);
+  }, [pegawai]);
 
   // Data Jurnal Harian & Bukti Foto Kerja (Dimulai bersih dari kosong)
   const [journals, setJournals] = useState(() => {
@@ -284,7 +262,6 @@ export default function App() {
       version: "2.0-monthly-report",
       exportDate: new Date().toISOString(),
       pegawai,
-      penilai,
       periode,
       journals
     };
@@ -294,7 +271,6 @@ export default function App() {
   // Import JSON
   const handleImportJson = (json) => {
     if (json.pegawai) setPegawai(json.pegawai);
-    if (json.penilai) setPenilai(json.penilai);
     if (json.periode) setPeriode(json.periode);
     if (Array.isArray(json.journals)) setJournals(json.journals);
     alert("Data berhasil dipulihkan dari cadangan JSON!");
@@ -403,8 +379,6 @@ export default function App() {
         <MonthlyReportGenerator 
           pegawai={pegawai}
           setPegawai={setPegawai}
-          penilai={penilai}
-          setPenilai={setPenilai}
           rhkList={[]}
           journals={journals}
           pendekatan={pendekatan}

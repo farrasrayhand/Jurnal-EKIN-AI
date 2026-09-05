@@ -24,7 +24,6 @@ if (fs.existsSync(".env") && typeof process.loadEnvFile === "function") {
 import { 
   DEFAULT_SEED_ACCOUNTS, 
   DEFAULT_SEED_JOURNALS, 
-  DEFAULT_PENILAI, 
   hashPassword,
   saveStore,
   getStore
@@ -121,12 +120,6 @@ async function main() {
               new Date().toISOString()
             ]);
           }
-
-          await conn.query(`
-            INSERT INTO system_settings (setting_key, setting_val, updated_at)
-            VALUES ('penilai', ?, ?)
-            ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), updated_at = VALUES(updated_at)
-          `, [JSON.stringify(DEFAULT_PENILAI), new Date().toISOString()]);
 
           await conn.query(`
             INSERT INTO system_settings (setting_key, setting_val, updated_at)
@@ -227,14 +220,6 @@ async function main() {
 
           await client.query(`
             INSERT INTO system_settings (setting_key, setting_val, updated_at)
-            VALUES ('penilai', $1, $2)
-            ON CONFLICT (setting_key) DO UPDATE SET
-              setting_val = EXCLUDED.setting_val,
-              updated_at = EXCLUDED.updated_at
-          `, [JSON.stringify(DEFAULT_PENILAI), new Date().toISOString()]);
-
-          await client.query(`
-            INSERT INTO system_settings (setting_key, setting_val, updated_at)
             VALUES ('settings', $1, $2)
             ON CONFLICT (setting_key) DO UPDATE SET
               setting_val = EXCLUDED.setting_val,
@@ -255,7 +240,7 @@ async function main() {
     const current = getStore();
     current.accounts = DEFAULT_SEED_ACCOUNTS;
     current.journals = DEFAULT_SEED_JOURNALS;
-    current.penilai = DEFAULT_PENILAI;
+    delete current.penilai;
     saveStore(current);
     console.log("✅ Seeding JSON Store Lokal Selesai!");
   }

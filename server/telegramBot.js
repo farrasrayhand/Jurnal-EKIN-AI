@@ -1246,11 +1246,11 @@ export async function handleReport(botInstance, msg, match) {
     botInstance.sendChatAction(chatId, "upload_document");
 
     const userJournals = getJournals(user.id);
-    const { penilai, settings } = getSettings();
+    const { settings } = getSettings();
 
     const reportBundle = await generateMonthlyReportZip({
       pegawai: user,
-      penilai,
+      penilai: null,
       journals: userJournals,
       month: targetMonth,
       year: targetYear,

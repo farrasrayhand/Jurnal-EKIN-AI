@@ -395,28 +395,41 @@ export function generateMonthlyReportPdf({
       doc.moveDown(1.5);
 
       // -------------------------------------------------------------
-      // 5. TANDA TANGAN (PEJABAT PENILAI & PEGAWAI)
+      // 5. TANDA TANGAN (PEGAWAI YANG MEMBUAT LAPORAN)
       // -------------------------------------------------------------
+      const hasPenilai = Boolean(penilai && penilai.nama && penilai.nama.trim() && penilai.nama !== "ANDA SUPANDA, S.Pd, M.Pd");
       const signY = doc.y;
-      const signColW = tableWidth / 2;
 
-      // Kiri: Pejabat Penilai Kinerja
-      doc.fillColor("#000000").font("Times-Roman").fontSize(9);
-      doc.text("Pejabat Penilai Kinerja,", tableLeft, signY);
-      doc.moveDown(3);
-      doc.font("Times-Bold").fontSize(9).text(penilai?.nama || "ANDA SUPANDA, S.Pd, M.Pd", tableLeft, doc.y, { underline: true });
-      doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${penilai?.nip || "197505201998021001"}`, tableLeft, doc.y);
-      doc.text(`Pangkat: ${penilai?.pangkat || "Pembina Tingkat I / IV/b"}`, tableLeft, doc.y);
+      if (hasPenilai) {
+        // Dua Kolom jika ada penilai khusus
+        const signColW = tableWidth / 2;
+        doc.fillColor("#000000").font("Times-Roman").fontSize(9);
+        doc.text("Pejabat Penilai Kinerja,", tableLeft, signY);
+        doc.moveDown(3);
+        doc.font("Times-Bold").fontSize(9).text(penilai.nama, tableLeft, doc.y, { underline: true });
+        doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${penilai.nip || "-"}`, tableLeft, doc.y);
+        if (penilai.pangkat) doc.text(`Pangkat: ${penilai.pangkat}`, tableLeft, doc.y);
 
-      // Kanan: Pegawai yang Dinilai
-      const rightX = tableLeft + signColW;
-      const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
-      doc.font("Times-Roman").fontSize(9).text(`Samarinda, ${lastDay} ${monthName} ${year}`, rightX, signY);
-      doc.text("Pegawai yang Dinilai,", rightX, doc.y);
-      doc.moveDown(3);
-      doc.font("Times-Bold").fontSize(9).text(pegawai?.nama || "MUHAMMAD FARRAS RAYHAND", rightX, doc.y, { underline: true });
-      doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${pegawai?.nip || "200011192025211007"}`, rightX, doc.y);
-      doc.text(`Pangkat: ${pegawai?.pangkat || "Pengatur Muda / II/a"}`, rightX, doc.y);
+        const rightX = tableLeft + signColW;
+        const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+        doc.font("Times-Roman").fontSize(9).text(`Samarinda, ${lastDay} ${monthName} ${year}`, rightX, signY);
+        doc.text("Pegawai yang Dinilai,", rightX, doc.y);
+        doc.moveDown(3);
+        doc.font("Times-Bold").fontSize(9).text(pegawai?.nama || "Pegawai", rightX, doc.y, { underline: true });
+        doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${pegawai?.nip || "-"}`, rightX, doc.y);
+        if (pegawai?.pangkat) doc.text(`Pangkat: ${pegawai.pangkat}`, rightX, doc.y);
+      } else {
+        // Tanda Tangan Tunggal Pegawai yang Melaporkan Kinerja
+        const rightX = tableLeft + (tableWidth * 0.55);
+        const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+        doc.fillColor("#000000").font("Times-Roman").fontSize(9);
+        doc.text(`Samarinda, ${lastDay} ${monthName} ${year}`, rightX, signY);
+        doc.text("Pegawai yang Membuat Laporan,", rightX, doc.y);
+        doc.moveDown(3);
+        doc.font("Times-Bold").fontSize(9).text(pegawai?.nama || "Pegawai", rightX, doc.y, { underline: true });
+        doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${pegawai?.nip || "-"}`, rightX, doc.y);
+        if (pegawai?.pangkat) doc.text(`Pangkat: ${pegawai.pangkat}`, rightX, doc.y);
+      }
 
       doc.end();
     } catch (err) {

@@ -903,7 +903,7 @@ const server = http.createServer((req, res) => {
       || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
 
     const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username);
-    const penilai = storeData.penilai || { nama: "ANDA SUPANDA, S.Pd, M.Pd", nip: "197505201998021001", pangkat: "Pembina Tingkat I / IV/b", jabatan: "Kepala Sekolah" };
+    const penilai = null;
 
     if (pathname === "/api/reports/pdf") {
       generateMonthlyReportPdf({

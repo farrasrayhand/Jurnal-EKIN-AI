@@ -99,15 +99,6 @@ export const DEFAULT_SEED_ACCOUNTS = [
   }
 ];
 
-// Pejabat Penilai Default
-export const DEFAULT_PENILAI = {
-  nama: "ANDA SUPANDA, S.Pd, M.Pd",
-  nip: "197505201998021001",
-  pangkat: "Pembina Tingkat I / IV/b",
-  jabatan: "Kepala Sekolah",
-  unitKerja: "SMK N 07 SAMARINDA"
-};
-
 // Jurnal Awal Bawaan (Bulan Juli 2026 untuk demonstrasi cetak PDF langsung jalan)
 export const DEFAULT_SEED_JOURNALS = [
   {
@@ -167,7 +158,6 @@ function ensureDb() {
       registrationCodes: [],
       webSessions: {}, // { [token]: { userId, expiresAt, createdAt } }
       telegramSessions: {}, // { [chatId]: userId }
-      penilai: DEFAULT_PENILAI,
       settings: {
         gdriveLink: ""
       },
@@ -221,10 +211,6 @@ function ensureDb() {
       data.telegramSessions = {};
       modified = true;
     }
-    if (!data.penilai) {
-      data.penilai = DEFAULT_PENILAI;
-      modified = true;
-    }
     if (!data.settings) {
       data.settings = {
         gdriveLink: ""
@@ -255,7 +241,6 @@ function ensureDb() {
       registrationCodes: [],
       webSessions: {},
       telegramSessions: {},
-      penilai: DEFAULT_PENILAI,
       settings: {
         gdriveLink: ""
       },
@@ -961,21 +946,17 @@ export function deleteUserById(userIdOrUsername, deletePhysicalFiles = true) {
 }
 
 /**
- * Pengaturan Global & Pejabat Penilai
+ * Pengaturan Global Sistem
  */
 export function getSettings() {
   const store = getStore();
   return {
-    penilai: store.penilai || DEFAULT_PENILAI,
     settings: store.settings || { gdriveLink: "" }
   };
 }
 
 export function updateSettings(newSettings) {
   const store = getStore();
-  if (newSettings.penilai) {
-    store.penilai = { ...(store.penilai || DEFAULT_PENILAI), ...newSettings.penilai };
-  }
   if (newSettings.settings) {
     store.settings = { ...(store.settings || {}), ...newSettings.settings };
   }

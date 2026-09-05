@@ -2,7 +2,6 @@ import mysql from "mysql2/promise";
 import { 
   DEFAULT_SEED_ACCOUNTS, 
   DEFAULT_SEED_JOURNALS, 
-  DEFAULT_PENILAI, 
   hashPassword 
 } from "./dbStore.js";
 
@@ -235,13 +234,7 @@ export async function initMysqlDatabase() {
           ]);
         }
 
-        // C. Seed Penilai & Settings
-        await conn.query(`
-          INSERT INTO system_settings (setting_key, setting_val, updated_at)
-          VALUES ('penilai', ?, ?)
-          ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), updated_at = VALUES(updated_at)
-        `, [JSON.stringify(DEFAULT_PENILAI), new Date().toISOString()]);
-
+        // C. Seed Pengaturan Global
         await conn.query(`
           INSERT INTO system_settings (setting_key, setting_val, updated_at)
           VALUES ('settings', ?, ?)
@@ -261,7 +254,6 @@ export async function initMysqlDatabase() {
    - Pegawai 1    : Username "farras" (Role: pegawai)
    - Pegawai 2    : Username "budi.santoso" (Role: pegawai)
 📝 Jurnal Dibuat  : 3 Kegiatan Jurnal Contoh
-👔 Penilai Dibuat : ANDA SUPANDA, S.Pd, M.Pd
 ========================================================================
 `);
       } else {

@@ -25,8 +25,6 @@ const MONTHS_LIST = [
 export default function MonthlyReportGenerator({
   pegawai,
   setPegawai,
-  penilai,
-  setPenilai,
   rhkList,
   journals = [],
   pendekatan = "KUANTITATIF",

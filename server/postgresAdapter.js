@@ -2,7 +2,6 @@ import pg from "pg";
 import { 
   DEFAULT_SEED_ACCOUNTS, 
   DEFAULT_SEED_JOURNALS, 
-  DEFAULT_PENILAI, 
   hashPassword 
 } from "./dbStore.js";
 
@@ -268,15 +267,7 @@ export async function initPostgresDatabase() {
           ]);
         }
 
-        // C. Seed Penilai & Settings
-        await client.query(`
-          INSERT INTO system_settings (setting_key, setting_val, updated_at)
-          VALUES ('penilai', $1, $2)
-          ON CONFLICT (setting_key) DO UPDATE SET
-            setting_val = EXCLUDED.setting_val,
-            updated_at = EXCLUDED.updated_at
-        `, [JSON.stringify(DEFAULT_PENILAI), new Date().toISOString()]);
-
+        // C. Seed Pengaturan Global
         await client.query(`
           INSERT INTO system_settings (setting_key, setting_val, updated_at)
           VALUES ('settings', $1, $2)
@@ -298,7 +289,6 @@ export async function initPostgresDatabase() {
    - Pegawai 1    : Username "farras" (Role: pegawai)
    - Pegawai 2    : Username "budi.santoso" (Role: pegawai)
 📝 Jurnal Dibuat  : 3 Kegiatan Jurnal Contoh
-👔 Penilai Dibuat : ANDA SUPANDA, S.Pd, M.Pd
 ========================================================================
 `);
       } else {
