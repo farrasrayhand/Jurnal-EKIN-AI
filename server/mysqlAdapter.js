@@ -622,3 +622,67 @@ export async function syncStoreToMysql(store) {
     console.error("[MySQL] Gagal sinkronisasi data store ke MySQL:", err.message);
   }
 }
+
+/**
+ * Memeriksa status kesehatan koneksi database saat runtime
+ */
+export async function getDatabaseHealth() {
+  const config = getMysqlConfig();
+  if (!config) {
+    return {
+      type: "json",
+      label: "JSON Store (Local File)",
+      connected: false,
+      configured: false,
+      message: "MySQL tidak dikonfigurasi. Menggunakan database lokal ekinerja_store.json."
+    };
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return {
+      type: "mysql",
+      label: "MySQL / MariaDB",
+      connected: false,
+      configured: true,
+      host: config.host,
+      database: config.database,
+      message: "MySQL dikonfigurasi tetapi pool belum terinisialisasi."
+    };
+  }
+
+  try {
+    const conn = await pool.getConnection();
+    try {
+      const [accRows] = await conn.query("SELECT COUNT(*) AS count FROM accounts");
+      const [jrnRows] = await conn.query("SELECT COUNT(*) AS count FROM journals");
+      return {
+        type: "mysql",
+        label: "MySQL / MariaDB",
+        connected: true,
+        configured: true,
+        host: config.host,
+        port: config.port,
+        database: config.database,
+        counts: {
+          accounts: accRows[0]?.count || 0,
+          journals: jrnRows[0]?.count || 0
+        },
+        message: `Terhubung ke MySQL database '${config.database}' (${config.host}:${config.port})`
+      };
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    return {
+      type: "mysql",
+      label: "MySQL / MariaDB",
+      connected: false,
+      configured: true,
+      host: config.host,
+      database: config.database,
+      error: err.message,
+      message: `Gagal terhubung ke MySQL: ${err.message}. Fallback ke file JSON lokal aktif.`
+    };
+  }
+}

@@ -1008,21 +1008,35 @@ export function importAccountsFromExcel(file, defaultRole = "pegawai") {
 }
 
 // -------------------------------------------------------------
-// KONFIGURASI ADAPTER DATABASE DARI .ENV
+// KONFIGURASI ADAPTER DATABASE (MYSQL / MARIADB & FALLBACK JSON)
 // -------------------------------------------------------------
 export function getDatabaseConfig() {
-  const type = (import.meta.env.VITE_DB_TYPE || "sqlite").toLowerCase().trim();
+  const type = (import.meta.env.VITE_DB_TYPE || "mysql").toLowerCase().trim();
   const validTypes = ["sqlite", "postgres", "mysql"];
-  const dbType = validTypes.includes(type) ? type : "sqlite";
+  const dbType = validTypes.includes(type) ? type : "mysql";
 
   return {
-    type: dbType, // "sqlite" | "postgres" | "mysql"
-    label: dbType === "sqlite" ? "SQLite (Local File)" : dbType === "postgres" ? "PostgreSQL" : "MySQL / MariaDB",
+    type: dbType, // "mysql" | "postgres" | "sqlite"
+    label: dbType === "mysql" ? "MySQL / MariaDB" : dbType === "postgres" ? "PostgreSQL" : "SQLite (Local File)",
     host: import.meta.env.VITE_DB_HOST || "localhost",
     port: import.meta.env.VITE_DB_PORT || (dbType === "postgres" ? "5432" : dbType === "mysql" ? "3306" : ""),
-    name: import.meta.env.VITE_DB_NAME || "ekinerja_db",
+    name: import.meta.env.VITE_DB_NAME || "db_ekin",
     user: import.meta.env.VITE_DB_USER || (dbType === "postgres" ? "postgres" : "root"),
     sqliteFile: import.meta.env.VITE_SQLITE_FILE || "./database/ekinerja.sqlite",
     databaseUrl: import.meta.env.VITE_DATABASE_URL || ""
   };
+}
+
+/**
+ * Mengambil status realtime database dari backend server (/api/system/db-status)
+ */
+export async function fetchLiveDatabaseStatus() {
+  try {
+    const res = await fetch("/api/system/db-status");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data;
+  } catch (e) {
+    return null;
+  }
 }

@@ -69,7 +69,7 @@ import {
   ONE_DAY_MS
 } from "./dbStore.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
-import { initMysqlDatabase, loadStoreFromMysql, getMysqlConfig } from "./mysqlAdapter.js";
+import { initMysqlDatabase, loadStoreFromMysql, getMysqlConfig, getDatabaseHealth } from "./mysqlAdapter.js";
 
 // Rate Limiter Sederhana In-Memory untuk Cegah Brute-Force & DoS
 const rateLimitMap = new Map();
@@ -572,6 +572,20 @@ const server = http.createServer((req, res) => {
   if (pathname === "/api/bot-status") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(getBotConfig()));
+    return;
+  }
+
+  // Handler Status Database Server (MySQL / MariaDB vs Fallback JSON)
+  if (pathname === "/api/system/db-status" && (req.method === "GET" || req.method === "HEAD")) {
+    getDatabaseHealth().then(health => {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ success: true, ...health }));
+    }).catch(err => {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ success: false, type: "error", error: err.message }));
+    });
     return;
   }
 

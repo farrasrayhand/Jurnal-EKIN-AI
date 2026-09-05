@@ -38,6 +38,7 @@ import {
   importAccountsFromExcel,
   setCurrentUser,
   getDatabaseConfig,
+  fetchLiveDatabaseStatus,
   setAllAccountsEnvPermission,
   exportCurrentAccountsAsSeederCode,
   fetchRegistrationCodes,
@@ -65,6 +66,14 @@ export default function AccountManagerModal({
   onOpenGeminiSettings
 }) {
   const dbConfig = getDatabaseConfig();
+  const [liveDbStatus, setLiveDbStatus] = useState(null);
+
+  useEffect(() => {
+    fetchLiveDatabaseStatus().then(status => {
+      if (status) setLiveDbStatus(status);
+    });
+  }, []);
+
   const [accounts, setAccounts] = useState(() => getAccounts());
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSubTab, setActiveSubTab] = useState("list"); // "list" | "form" | "jabatan"
@@ -644,16 +653,16 @@ export default function AccountManagerModal({
                 <span 
                   style={{
                     fontSize: "0.72rem",
-                    background: "rgba(37, 99, 235, 0.12)",
-                    color: "#2563eb",
-                    border: "1px solid rgba(37, 99, 235, 0.25)",
+                    background: liveDbStatus?.connected ? "rgba(16, 185, 129, 0.15)" : "rgba(37, 99, 235, 0.12)",
+                    color: liveDbStatus?.connected ? "#059669" : "#2563eb",
+                    border: `1px solid ${liveDbStatus?.connected ? "rgba(16, 185, 129, 0.3)" : "rgba(37, 99, 235, 0.25)"}`,
                     padding: "2px 8px",
                     borderRadius: "12px",
                     fontWeight: "700"
                   }}
-                  title="Tipe database adapter yang dikonfigurasi di file .env"
+                  title={liveDbStatus?.message || "Status adapter database aplikasi"}
                 >
-                  🗄️ DB: {dbConfig.label}
+                  🗄️ DB: {liveDbStatus ? (liveDbStatus.connected ? `${liveDbStatus.label} (${liveDbStatus.database})` : `${liveDbStatus.label} (Fallback JSON)`) : dbConfig.label}
                 </span>
               </div>
               <p style={{ margin: "2px 0 0 0", fontSize: "0.8rem", color: "var(--text-muted)" }}>
