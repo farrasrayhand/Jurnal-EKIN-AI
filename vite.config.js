@@ -3,21 +3,7 @@ import { defineConfig } from 'vite'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { 
-  authenticateUser, 
-  sanitizeUser, 
-  hashPassword,
-  getRegistrationCodes,
-  createRegistrationCode,
-  deleteRegistrationCode,
-  registerNewUser,
-  createWebSession,
-  getWebSession,
-  deleteWebSession,
-  cleanupExpiredSessions,
-  ONE_DAY_MS
-} from './server/dbStore.js'
-import { generateMonthlyReportPdf, generateMonthlyReportZip } from './server/pdfGenerator.js'
+
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -33,7 +19,25 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 function apiSyncPlugin() {
   return {
     name: 'api-sync-plugin',
-    configureServer(server) {
+    async configureServer(server) {
+      const dbStore = await import('./server/dbStore.js')
+      const pdfGen = await import('./server/pdfGenerator.js')
+      const { 
+        authenticateUser, 
+        sanitizeUser, 
+        hashPassword,
+        getRegistrationCodes,
+        createRegistrationCode,
+        deleteRegistrationCode,
+        registerNewUser,
+        createWebSession,
+        getWebSession,
+        deleteWebSession,
+        cleanupExpiredSessions,
+        ONE_DAY_MS
+      } = dbStore
+      const { generateMonthlyReportPdf, generateMonthlyReportZip } = pdfGen
+
       // Muat .env jika tersedia
       if (fs.existsSync('.env') && typeof process.loadEnvFile === 'function') {
         try {
@@ -505,10 +509,13 @@ function apiSyncPlugin() {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), apiSyncPlugin()],
+export default defineConfig(({ command }) => ({
+  plugins: [
+    react(),
+    command === 'serve' ? apiSyncPlugin() : null
+  ].filter(Boolean),
   define: {
     '__BOT_ENABLED_ENV__': JSON.stringify(Boolean((process.env.TELEGRAM_BOT_TOKEN || '').trim())),
     '__BOT_USERNAME_ENV__': JSON.stringify((process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, '').trim())
   }
-})
+}))

@@ -13,6 +13,9 @@
     "lint": "oxlint",
     "preview": "vite preview"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "exceljs": "^4.4.0",
