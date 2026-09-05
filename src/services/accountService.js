@@ -680,27 +680,41 @@ export function resolveEffectiveApiKey(currentUser, envApiKey, serverAiConfig = 
   const aiConfig = serverAiConfig || cachedAiConfig;
   const serverHasKey = Boolean(aiConfig?.hasServerKey || aiConfig?.enabled);
 
-  // Jika user memilih menggunakan key pribadi dan ada isinya
-  if (currentUser?.usePersonalKey && currentUser?.personalApiKey) {
+  // 1. Jika user secara eksplisit memilih Mode Offline
+  if (currentUser?.aiModeChoice === "offline") {
     return {
-      key: currentUser.personalApiKey,
-      source: "personal",
-      label: isSuperadmin ? "Key Pribadi Admin" : "Key Pribadi Akun",
-      isOnline: true
+      key: "",
+      source: "offline",
+      label: "Mode Offline",
+      isOnline: false
     };
   }
 
-  // Jika diizinkan memakai .env dan .env memiliki key (baik client Vite maupun server Node.js)
-  if (userAllowedEnv && (envApiKey || serverHasKey)) {
-    return {
-      key: envApiKey || "server-managed",
-      source: "env",
-      label: "Sistem (.env)",
-      isOnline: true
-    };
+  // 2. Jika user secara eksplisit memilih Key Pribadi atau usePersonalKey = true
+  if (currentUser?.aiModeChoice === "personal" || currentUser?.usePersonalKey) {
+    if (currentUser?.personalApiKey) {
+      return {
+        key: currentUser.personalApiKey,
+        source: "personal",
+        label: isSuperadmin ? "Key Pribadi Admin" : "Key Pribadi Akun",
+        isOnline: true
+      };
+    }
   }
 
-  // Jika dilarang memakai .env atau .env kosong, gunakan key pribadi akun jika ada
+  // 3. Jika user memilih .env (atau default) dan diizinkan memakai .env sistem
+  if (currentUser?.aiModeChoice === "env" || !currentUser?.aiModeChoice) {
+    if (userAllowedEnv && (envApiKey || serverHasKey)) {
+      return {
+        key: envApiKey || "server-managed",
+        source: "env",
+        label: "Sistem (.env)",
+        isOnline: true
+      };
+    }
+  }
+
+  // 4. Jika dilarang memakai .env atau .env kosong, gunakan key pribadi akun jika ada
   if (currentUser?.personalApiKey) {
     return {
       key: currentUser.personalApiKey,
@@ -710,9 +724,10 @@ export function resolveEffectiveApiKey(currentUser, envApiKey, serverAiConfig = 
     };
   }
 
+  // 5. Default fallback: Mode Offline Bawaan
   return {
     key: "",
-    source: "none",
+    source: "offline",
     label: "Mode Offline",
     isOnline: false
   };

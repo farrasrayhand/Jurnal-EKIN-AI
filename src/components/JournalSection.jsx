@@ -23,7 +23,8 @@ export default function JournalSection({
   currentUser,
   isSyncing = false,
   onRefreshSync = null,
-  lastSyncTime = null
+  lastSyncTime = null,
+  onOpenGeminiModal = null
 }) {
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isPolishing, setIsPolishing] = useState(false);
@@ -696,45 +697,54 @@ export default function JournalSection({
               </label>
 
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                {apiKeyInfo?.key ? (
-                  <span 
-                    style={{ 
-                      fontSize: "0.72rem", 
-                      background: "rgba(16, 185, 129, 0.12)", 
-                      color: "#059669", 
-                      padding: "2px 8px", 
-                      borderRadius: "10px", 
-                      fontWeight: "700", 
-                      border: "1px solid rgba(16, 185, 129, 0.25)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    title={apiKeyInfo.source === "env" ? "Gemini AI Online (Sistem .env) aktif" : "Gemini AI Online (Key Pribadi) aktif"}
-                  >
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#10b981" }}></span>
-                    Online ({apiKeyInfo.source === "env" ? ".env" : "Pribadi"})
+                <button
+                  type="button"
+                  onClick={() => onOpenGeminiModal && onOpenGeminiModal()}
+                  style={{
+                    fontSize: "0.72rem",
+                    background: apiKeyInfo?.source === "env" 
+                      ? "rgba(16, 185, 129, 0.12)" 
+                      : apiKeyInfo?.source === "personal" 
+                      ? "rgba(139, 92, 246, 0.12)" 
+                      : "rgba(245, 158, 11, 0.12)",
+                    color: apiKeyInfo?.source === "env" 
+                      ? "#059669" 
+                      : apiKeyInfo?.source === "personal" 
+                      ? "#7c3aed" 
+                      : "#d97706",
+                    padding: "3px 9px",
+                    borderRadius: "10px",
+                    fontWeight: "700",
+                    border: `1px solid ${apiKeyInfo?.source === "env" 
+                      ? "rgba(16, 185, 129, 0.3)" 
+                      : apiKeyInfo?.source === "personal" 
+                      ? "rgba(139, 92, 246, 0.3)" 
+                      : "rgba(245, 158, 11, 0.3)"}`,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                    cursor: onOpenGeminiModal ? "pointer" : "default"
+                  }}
+                  title="Klik untuk memilih mode AI: .env Sistem, Key Pribadi, atau Mode Offline Bawaan"
+                >
+                  <span style={{ 
+                    width: "6px", 
+                    height: "6px", 
+                    borderRadius: "50%", 
+                    background: apiKeyInfo?.source === "env" 
+                      ? "#10b981" 
+                      : apiKeyInfo?.source === "personal" 
+                      ? "#8b5cf6" 
+                      : "#f59e0b" 
+                  }}></span>
+                  <span>
+                    {apiKeyInfo?.source === "env" 
+                      ? "Mode: .env Sistem" 
+                      : apiKeyInfo?.source === "personal" 
+                      ? "Mode: Key Pribadi" 
+                      : "Mode: AI Offline"}
                   </span>
-                ) : (
-                  <span 
-                    style={{ 
-                      fontSize: "0.72rem", 
-                      background: "rgba(245, 158, 11, 0.12)", 
-                      color: "#d97706", 
-                      padding: "2px 8px", 
-                      borderRadius: "10px", 
-                      fontWeight: "700", 
-                      border: "1px solid rgba(245, 158, 11, 0.25)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                    title="Belum ada API Key - AI berjalan dalam Mode Cerdas Offline bawaan (Tetap bisa memoles tanpa batasan)"
-                  >
-                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#f59e0b" }}></span>
-                    AI Offline (Bawaan)
-                  </span>
-                )}
+                </button>
 
                 <button
                   type="button"

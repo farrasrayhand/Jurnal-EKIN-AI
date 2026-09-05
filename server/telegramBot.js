@@ -35,6 +35,19 @@ import {
 import { polishJournalNode } from "./aiServiceNode.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
 
+// Helper menentukan API Key AI untuk pengguna Telegram sesuai preferensi (env / personal / offline)
+function resolveTelegramUserApiKey(user) {
+  if (!user) return "";
+  if (user.aiModeChoice === "offline") return "offline";
+  if (user.aiModeChoice === "personal" || user.usePersonalKey) {
+    return user.personalApiKey || (user.allowEnvKey === false ? "offline" : "");
+  }
+  if (user.allowEnvKey === false) {
+    return user.personalApiKey || "offline";
+  }
+  return "";
+}
+
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -1957,7 +1970,7 @@ export async function handleIncomingText(botInstance, msg) {
       rawText: cleanText,
       jabatan: user.jabatan,
       unitKerja: user.unitKerja,
-      apiKey: user.personalApiKey || ""
+      apiKey: resolveTelegramUserApiKey(user)
     });
 
     const now = new Date();
@@ -2297,7 +2310,7 @@ async function processMediaGroup(botInstance, mgId) {
       rawText: cleanText,
       jabatan: session.user.jabatan,
       unitKerja: session.user.unitKerja,
-      apiKey: session.user.personalApiKey || ""
+      apiKey: resolveTelegramUserApiKey(session.user)
     });
 
     const now = customDate || new Date().toISOString().slice(0, 10);
@@ -2397,7 +2410,7 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       rawText: cleanText,
       jabatan: session.user.jabatan,
       unitKerja: session.user.unitKerja,
-      apiKey: session.user.personalApiKey || ""
+      apiKey: resolveTelegramUserApiKey(session.user)
     });
 
     const now = customDate || new Date().toISOString().slice(0, 10);

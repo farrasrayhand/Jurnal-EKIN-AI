@@ -325,11 +325,12 @@ export default function App() {
   // Modal Gemini Key
   const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
 
-  const handleSaveUserKey = (personalKey, usePersonal) => {
+  const handleSaveUserKey = (personalKey, usePersonal, modeChoice = null) => {
     const updatedUser = {
       ...currentUser,
       personalApiKey: personalKey,
-      usePersonalKey: usePersonal
+      usePersonalKey: Boolean(usePersonal),
+      aiModeChoice: modeChoice || (usePersonal ? "personal" : (personalKey ? "personal" : "env"))
     };
     saveAccount(updatedUser);
     handleUserChanged(updatedUser);
@@ -455,6 +456,7 @@ export default function App() {
           isSyncing={isSyncing}
           onRefreshSync={() => fetchAndSyncJournals(true)}
           lastSyncTime={lastSyncTime}
+          onOpenGeminiModal={() => setIsGeminiModalOpen(true)}
         />
       )}
 

@@ -10,7 +10,8 @@ import {
   Lock, 
   Server, 
   User,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react";
 
 export default function GeminiModal({
@@ -27,11 +28,15 @@ export default function GeminiModal({
   const hasEnvKey = Boolean(envApiKey) || Boolean(serverAiConfig?.hasServerKey || serverAiConfig?.enabled);
   const isAllowedEnv = isSuperadmin || (typeof currentUser?.allowEnvKey === "boolean" ? currentUser.allowEnvKey : allowEnvKey);
 
-  // State Pilihan Sumber Key: "env" | "personal"
+  // State Pilihan Mode AI: "env" | "personal" | "offline"
   const [keyChoice, setKeyChoice] = useState(() => {
-    if (currentUser?.usePersonalKey) return "personal";
+    if (currentUser?.aiModeChoice === "offline") return "offline";
+    if (currentUser?.aiModeChoice === "personal") return "personal";
+    if (currentUser?.aiModeChoice === "env" && hasEnvKey && isAllowedEnv) return "env";
+    if (currentUser?.usePersonalKey && currentUser?.personalApiKey) return "personal";
     if (hasEnvKey && isAllowedEnv) return "env";
-    return "personal";
+    if (currentUser?.personalApiKey) return "personal";
+    return "offline";
   });
 
   const [personalKeyInput, setPersonalKeyInput] = useState(currentUser?.personalApiKey || "");
@@ -40,12 +45,24 @@ export default function GeminiModal({
   useEffect(() => {
     if (currentUser) {
       setPersonalKeyInput(currentUser.personalApiKey || "");
-      if (currentUser.usePersonalKey) {
+      if (currentUser.aiModeChoice === "offline") {
+        setKeyChoice("offline");
+      } else if (currentUser.aiModeChoice === "personal") {
+        setKeyChoice("personal");
+      } else if (currentUser.aiModeChoice === "env") {
+        if (hasEnvKey && isAllowedEnv) {
+          setKeyChoice("env");
+        } else {
+          setKeyChoice(currentUser.personalApiKey ? "personal" : "offline");
+        }
+      } else if (currentUser.usePersonalKey && currentUser.personalApiKey) {
         setKeyChoice("personal");
       } else if (hasEnvKey && isAllowedEnv) {
         setKeyChoice("env");
-      } else {
+      } else if (currentUser.personalApiKey) {
         setKeyChoice("personal");
+      } else {
+        setKeyChoice("offline");
       }
     }
   }, [currentUser, allowEnvKey, hasEnvKey, isAllowedEnv, serverAiConfig]);
@@ -54,7 +71,7 @@ export default function GeminiModal({
 
   const handleSave = () => {
     const usePersonal = keyChoice === "personal";
-    onSaveUserKey(personalKeyInput.trim(), usePersonal);
+    onSaveUserKey(personalKeyInput.trim(), usePersonal, keyChoice);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -64,10 +81,9 @@ export default function GeminiModal({
 
   const handleClearPersonal = () => {
     setPersonalKeyInput("");
-    onSaveUserKey("", false);
-    if (hasEnvKey && isAllowedEnv) {
-      setKeyChoice("env");
-    }
+    const nextChoice = (hasEnvKey && isAllowedEnv) ? "env" : "offline";
+    setKeyChoice(nextChoice);
+    onSaveUserKey("", false, nextChoice);
   };
 
   return (
@@ -314,49 +330,59 @@ export default function GeminiModal({
             )
           )}
 
-          {/* PILIHAN SUMBER KEY */}
+          {/* PILIHAN SUMBER KEY / MODE PEMROSESAN AI */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             <label style={{ fontSize: "0.82rem", fontWeight: "700", color: "var(--text-primary)" }}>
-              Pilih Sumber API Key untuk Akun Anda:
+              Pilih Mode Pemrosesan AI untuk Akun Anda:
             </label>
 
             {/* Opsi 1: Gunakan Key Sistem (.env) */}
-            {(hasEnvKey && isAllowedEnv) && (
-              <label 
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: "0.75rem",
-                  padding: "0.85rem 1rem",
-                  borderRadius: "8px",
-                  border: `1.5px solid ${keyChoice === "env" ? "#2563eb" : "var(--border-subtle)"}`,
-                  background: keyChoice === "env" ? "rgba(37, 99, 235, 0.05)" : "var(--bg-secondary)",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease"
-                }}
-              >
-                <input
-                  type="radio"
-                  name="geminiSource"
-                  value="env"
-                  checked={keyChoice === "env"}
-                  onChange={() => setKeyChoice("env")}
-                  style={{ marginTop: "3px", accentColor: "#2563eb" }}
-                />
-                <div>
-                  <div style={{ fontWeight: "700", fontSize: "0.88rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                    <Server size={14} style={{ color: "#2563eb" }} />
-                    <span>Gunakan API Key Bersama dari Sistem (.env)</span>
+            <label 
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+                padding: "0.85rem 1rem",
+                borderRadius: "8px",
+                border: `1.5px solid ${keyChoice === "env" ? "#2563eb" : "var(--border-subtle)"}`,
+                background: keyChoice === "env" ? "rgba(37, 99, 235, 0.05)" : "var(--bg-secondary)",
+                cursor: (hasEnvKey && isAllowedEnv) ? "pointer" : "not-allowed",
+                opacity: (hasEnvKey && isAllowedEnv) ? 1 : 0.6,
+                transition: "all 0.15s ease"
+              }}
+            >
+              <input
+                type="radio"
+                name="geminiSource"
+                value="env"
+                disabled={!(hasEnvKey && isAllowedEnv)}
+                checked={keyChoice === "env"}
+                onChange={() => setKeyChoice("env")}
+                style={{ marginTop: "3px", accentColor: "#2563eb" }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "700", fontSize: "0.88rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                  <Server size={14} style={{ color: "#2563eb" }} />
+                  <span>Gunakan AI Bersama dari Sistem (.env)</span>
+                  {hasEnvKey && isAllowedEnv ? (
                     <span style={{ fontSize: "0.72rem", background: "#dcfce7", color: "#166534", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
-                      Tersedia
+                      Tersedia &amp; Diizinkan
                     </span>
-                  </div>
-                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Praktis, langsung aktif otomatis tanpa perlu mendaftar Google AI Studio.
-                  </div>
+                  ) : !hasEnvKey ? (
+                    <span style={{ fontSize: "0.72rem", background: "#f3f4f6", color: "#6b7280", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
+                      Belum Diatur di Server
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.72rem", background: "#fee2e2", color: "#991b1b", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
+                      Dibatasi Administrator
+                    </span>
+                  )}
                 </div>
-              </label>
-            )}
+                <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                  Praktis menggunakan Gemini 2.5 Flash Online dari konfigurasi server tanpa perlu mendaftar key sendiri.
+                </div>
+              </div>
+            </label>
 
             {/* Opsi 2: Gunakan Key Pribadi Akun */}
             <label 
@@ -366,8 +392,8 @@ export default function GeminiModal({
                 gap: "0.75rem",
                 padding: "0.85rem 1rem",
                 borderRadius: "8px",
-                border: `1.5px solid ${keyChoice === "personal" ? "#2563eb" : "var(--border-subtle)"}`,
-                background: keyChoice === "personal" ? "rgba(37, 99, 235, 0.05)" : "var(--bg-secondary)",
+                border: `1.5px solid ${keyChoice === "personal" ? "#7c3aed" : "var(--border-subtle)"}`,
+                background: keyChoice === "personal" ? "rgba(124, 58, 237, 0.05)" : "var(--bg-secondary)",
                 cursor: "pointer",
                 transition: "all 0.15s ease"
               }}
@@ -378,20 +404,60 @@ export default function GeminiModal({
                 value="personal"
                 checked={keyChoice === "personal"}
                 onChange={() => setKeyChoice("personal")}
-                style={{ marginTop: "3px", accentColor: "#2563eb" }}
+                style={{ marginTop: "3px", accentColor: "#7c3aed" }}
               />
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: "700", fontSize: "0.88rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <div style={{ fontWeight: "700", fontSize: "0.88rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
                   <User size={14} style={{ color: "#7c3aed" }} />
-                  <span>Gunakan API Key Pribadi Akun Saya Sendiri</span>
-                  {personalKeyInput && (
+                  <span>Gunakan API Key Gemini Pribadi Akun Sendiri</span>
+                  {personalKeyInput ? (
                     <span style={{ fontSize: "0.72rem", background: "#f3e8ff", color: "#6b21a8", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
-                      Tersimpan
+                      Key Tersimpan
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "0.72rem", background: "#f3f4f6", color: "#6b7280", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
+                      Perlu Input Key
                     </span>
                   )}
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Gunakan kuota independen milik Anda sendiri (disarankan jika API sistem limit / bermasalah).
+                  Gunakan kuota independen milik Anda sendiri dari Google AI Studio (disarankan jika kuota bersama limit).
+                </div>
+              </div>
+            </label>
+
+            {/* Opsi 3: Gunakan Mode AI Cerdas Offline (Bawaan BKN) */}
+            <label 
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+                padding: "0.85rem 1rem",
+                borderRadius: "8px",
+                border: `1.5px solid ${keyChoice === "offline" ? "#d97706" : "var(--border-subtle)"}`,
+                background: keyChoice === "offline" ? "rgba(245, 158, 11, 0.05)" : "var(--bg-secondary)",
+                cursor: "pointer",
+                transition: "all 0.15s ease"
+              }}
+            >
+              <input
+                type="radio"
+                name="geminiSource"
+                value="offline"
+                checked={keyChoice === "offline"}
+                onChange={() => setKeyChoice("offline")}
+                style={{ marginTop: "3px", accentColor: "#d97706" }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "700", fontSize: "0.88rem", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                  <Zap size={14} style={{ color: "#d97706" }} />
+                  <span>Gunakan Mode AI Cerdas Offline (Bawaan BKN)</span>
+                  <span style={{ fontSize: "0.72rem", background: "#fef3c7", color: "#92400e", padding: "1px 6px", borderRadius: "10px", fontWeight: "700" }}>
+                    Instan &amp; Tanpa Kuota
+                  </span>
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                  Memoles catatan kasaran menggunakan engine heuristik lokal kedinasan ASN tanpa kuota dan tanpa butuh koneksi internet.
                 </div>
               </div>
             </label>
@@ -448,7 +514,13 @@ export default function GeminiModal({
               fontWeight: "600"
             }}>
               <Check size={16} />
-              <span>Pengaturan API Key akun Anda berhasil disimpan!</span>
+              <span>
+                {keyChoice === "env" 
+                  ? "Mode AI Bersama (.env Sistem) berhasil diaktifkan!" 
+                  : keyChoice === "personal" 
+                  ? "API Key Gemini Pribadi berhasil disimpan dan aktif!" 
+                  : "Mode AI Cerdas Offline BKN berhasil diaktifkan!"}
+              </span>
             </div>
           )}
         </div>

@@ -14,6 +14,11 @@ export async function polishJournalNode({
     throw new Error("Tuliskan catatan aktivitas kasaran terlebih dahulu!");
   }
 
+  // Jika pemanggil meminta eksplisit mode offline (tanpa memanggil Google API)
+  if (apiKey === "offline") {
+    return polishJournalOfflineNode(rawText);
+  }
+
   const rawServerKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "").trim().replace(/^["']|["']$/g, "").trim();
   const effectiveKey = (apiKey && apiKey !== "server-managed" && !apiKey.startsWith("server-"))
     ? apiKey.trim()
