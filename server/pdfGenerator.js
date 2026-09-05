@@ -402,28 +402,8 @@ export function generateMonthlyReportPdf({
           underline: true
         });
 
-        doc.moveDown(1.5);
-      } else {
-        if (tableY + 90 > 770) {
-          doc.addPage();
-          tableY = 40;
-        }
-        doc.y = tableY + 14;
+        doc.moveDown(1.0);
       }
-
-      // -------------------------------------------------------------
-      // 5. TANDA TANGAN (PEGAWAI YANG MEMBUAT LAPORAN)
-      // -------------------------------------------------------------
-      const signY = doc.y;
-      const rightX = tableLeft + (tableWidth * 0.55);
-      const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
-      doc.fillColor("#000000").font("Times-Roman").fontSize(9);
-      doc.text(`Samarinda, ${lastDay} ${monthName} ${year}`, rightX, signY);
-      doc.text("Pegawai yang Membuat Laporan,", rightX, doc.y);
-      doc.moveDown(3);
-      doc.font("Times-Bold").fontSize(9).text(pegawai?.nama || "Pegawai", rightX, doc.y, { underline: true });
-      doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${pegawai?.nip || "-"}`, rightX, doc.y);
-      if (pegawai?.pangkat) doc.text(`Pangkat: ${pegawai.pangkat}`, rightX, doc.y);
 
       doc.end();
     } catch (err) {
