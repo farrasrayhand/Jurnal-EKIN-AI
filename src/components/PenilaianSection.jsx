@@ -320,26 +320,6 @@ export default function PenilaianSection({
                     Batas : <span style={{ color: "#334155" }}>{p.batas}</span>
                   </div>
                 </div>
-
-                {/* Sisi Kanan: Informasi Atasan Penilai (Jika ada) */}
-                {penilai && penilai.nama && !penilai.nama.includes("ANDA SUPANDA") && (
-                  <div style={{ fontSize: "0.85rem", lineHeight: "1.45", color: "#64748b", minWidth: "240px" }}>
-                    <div>Atasan</div>
-                    <div style={{ fontWeight: "700", color: "#1e293b", textTransform: "uppercase" }}>
-                      {penilai.nama}
-                    </div>
-                    {penilai.jabatan && (
-                      <div>
-                        Jabatan : <span style={{ color: "#334155" }}>{penilai.jabatan}</span>
-                      </div>
-                    )}
-                    {penilai.unitKerja && (
-                      <div>
-                        Unit Kerja : <span style={{ color: "#334155" }}>{penilai.unitKerja}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Baris Tombol Cetak & SIASN (Tepat di bawah info tanggal, sisi kiri sesuai BKN) */}

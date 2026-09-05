@@ -4,8 +4,6 @@ import { User, UserCheck, Calendar, Building2, Briefcase, FileText } from "lucid
 export default function ProfileForm({
   pegawai,
   setPegawai,
-  penilai,
-  setPenilai,
   periode,
   setPeriode,
   intervensiPimpinan,
@@ -123,7 +121,7 @@ export default function ProfileForm({
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: "700" }}>Data Pegawai & Pejabat Penilai Kinerja</h2>
+              <h2 style={{ fontSize: "1.1rem", fontWeight: "700" }}>Data Identitas Pegawai ASN</h2>
               <span className={`badge ${pendekatan === "KUALITATIF" ? "badge-tambahan" : "badge-utama"}`} style={{ fontSize: "0.72rem" }}>
                 Pendekatan {pendekatan === "KUALITATIF" ? "Kualitatif" : "Kuantitatif"}
               </span>
@@ -236,7 +234,7 @@ export default function ProfileForm({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.5rem" }}>
+          <div>
             {/* Kolom Pegawai yang Dinilai */}
             <div style={{
               padding: "1.25rem",
@@ -246,10 +244,10 @@ export default function ProfileForm({
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", color: "var(--accent-primary)" }}>
                 <User size={18} />
-                <h3 style={{ fontSize: "0.95rem", fontWeight: "700" }}>A. PEGAWAI YANG DINILAI</h3>
+                <h3 style={{ fontSize: "0.95rem", fontWeight: "700" }}>DATA IDENTITAS PEGAWAI</h3>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.85rem" }}>
                 <div className="form-group">
                   <label className="form-label">Nama Lengkap (Beserta Gelar)</label>
                   <input 
@@ -291,80 +289,13 @@ export default function ProfileForm({
                     placeholder="Pranata Komputer Ahli Pertama"
                   />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: "1 / -1" }}>
                   <label className="form-label">Unit Kerja</label>
                   <input 
                     type="text" 
                     className="input-field"
                     value={pegawai.unitKerja || ""}
                     onChange={(e) => setPegawai({ ...pegawai, unitKerja: e.target.value })}
-                    placeholder="Dinas Komunikasi, Informatika, dan Statistik"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Kolom Pejabat Penilai Kinerja */}
-            <div style={{
-              padding: "1.25rem",
-              background: "var(--bg-secondary)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "var(--radius-md)"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem", color: "var(--accent-emerald)" }}>
-                <UserCheck size={18} />
-                <h3 style={{ fontSize: "0.95rem", fontWeight: "700" }}>B. PEJABAT PENILAI KINERJA (ATASAN)</h3>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                <div className="form-group">
-                  <label className="form-label">Nama Lengkap Pejabat Penilai</label>
-                  <input 
-                    type="text" 
-                    className="input-field"
-                    value={penilai.nama || ""}
-                    onChange={(e) => setPenilai({ ...penilai, nama: e.target.value })}
-                    placeholder="Contoh: Dr. Hendra Wijaya, M.Si."
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">NIP Pejabat Penilai</label>
-                  <input 
-                    type="text" 
-                    className="input-field font-mono"
-                    value={penilai.nip || ""}
-                    onChange={(e) => setPenilai({ ...penilai, nip: e.target.value })}
-                    placeholder="197805122002121004"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Pangkat / Golongan Ruang</label>
-                  <input 
-                    type="text" 
-                    className="input-field"
-                    value={penilai.pangkat || ""}
-                    onChange={(e) => setPenilai({ ...penilai, pangkat: e.target.value })}
-                    placeholder="Contoh: Pembina / IV/a"
-                    list="pangkat-list"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Jabatan Pejabat Penilai</label>
-                  <input 
-                    type="text" 
-                    className="input-field"
-                    value={penilai.jabatan || ""}
-                    onChange={(e) => setPenilai({ ...penilai, jabatan: e.target.value })}
-                    placeholder="Kepala Bidang Penyelenggaraan E-Government"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Unit Kerja Pejabat Penilai</label>
-                  <input 
-                    type="text" 
-                    className="input-field"
-                    value={penilai.unitKerja || ""}
-                    onChange={(e) => setPenilai({ ...penilai, unitKerja: e.target.value })}
                     placeholder="Dinas Komunikasi, Informatika, dan Statistik"
                   />
                 </div>
