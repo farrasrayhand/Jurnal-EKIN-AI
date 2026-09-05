@@ -66,7 +66,7 @@ Hasilkan minimal 3 RHK UTAMA dan 1 RHK TAMBAHAN. Setiap RHK WAJIB memiliki 3 Asp
 Balas HANYA dengan kode JSON valid tanpa markdown backtick.
   `.trim();
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
 
   const response = await fetch(endpoint, {
     method: "POST",

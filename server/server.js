@@ -141,7 +141,7 @@ const getAiConfig = () => {
     enabled: hasServerKey,
     hasServerKey: hasServerKey,
     provider: "gemini",
-    model: "gemini-2.5-flash"
+    model: "gemini-3.5-flash-lite"
   };
 };
 
@@ -1177,7 +1177,7 @@ async function startServer() {
 🌐 Web App Port   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}
 📊 API Sync Path  : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/api/sync
 🗄️ Database Mode  : ${dbStatus}
-✨ Gemini AI      : ${aiConfigInfo.hasServerKey ? "Aktif (Google Gemini 2.5 Flash Online)" : "Mode Cerdas Heuristik ASN (Offline/Tanpa Key)"}
+✨ Gemini AI      : ${aiConfigInfo.hasServerKey ? "Aktif (Google Gemini 3.5 Flash Lite Online)" : "Mode Cerdas Heuristik ASN (Offline/Tanpa Key)"}
 🩺 Health Check   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/health
 🤖 Telegram Bot   : ${process.env.TELEGRAM_BOT_TOKEN ? "Aktif Otomatis (Polling Siap)" : "Standby (Menunggu Token di Environment Easypanel)"}
 ========================================================================

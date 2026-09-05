@@ -184,7 +184,7 @@ export function getTelegramBotConfig() {
 let cachedAiConfig = {
   enabled: false,
   hasServerKey: false,
-  model: "gemini-2.5-flash"
+  model: "gemini-3.5-flash-lite"
 };
 
 /**
@@ -206,7 +206,7 @@ export async function fetchServerAiStatus() {
         cachedAiConfig = {
           enabled: Boolean(data.hasServerKey || data.enabled),
           hasServerKey: Boolean(data.hasServerKey || data.enabled),
-          model: data.model || "gemini-2.5-flash"
+          model: data.model || "gemini-3.5-flash-lite"
         };
         return cachedAiConfig;
       }
@@ -257,7 +257,7 @@ export async function syncWithBackend() {
         cachedAiConfig = {
           enabled: Boolean(data.aiConfig.hasServerKey || data.aiConfig.enabled),
           hasServerKey: Boolean(data.aiConfig.hasServerKey || data.aiConfig.enabled),
-          model: data.aiConfig.model || "gemini-2.5-flash"
+          model: data.aiConfig.model || "gemini-3.5-flash-lite"
         };
       }
       if (data && Array.isArray(data.accounts)) {
