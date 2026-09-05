@@ -696,6 +696,9 @@ export function addAttachmentToJournal(journalId, attachment) {
   if (!jrn.fotoPath && newAtt.type === "image") {
     jrn.fotoPath = newAtt.filePath;
   }
+  if (!jrn.fotoUrl && newAtt.type === "image") {
+    jrn.fotoUrl = newAtt.fileUrl;
+  }
   if (!jrn.filePath && newAtt.type !== "image") {
     jrn.filePath = newAtt.filePath;
   }

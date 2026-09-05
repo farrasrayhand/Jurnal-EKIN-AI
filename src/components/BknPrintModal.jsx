@@ -307,55 +307,84 @@ export default function BknPrintModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {journals.filter(j => Boolean(j.fileName || j.linkUrl)).map((j, idx) => (
-                    <tr key={j.id || idx}>
-                      <td style={{ textAlign: "center", border: "1px solid #000", padding: "4px" }}>{idx + 1}</td>
-                      <td style={{ textAlign: "center", border: "1px solid #000", padding: "4px" }}>{j.tanggal}</td>
-                      <td style={{ border: "1px solid #000", padding: "4px" }}>
-                        <strong>{j.aktivitas}</strong>
-                        {j.outputJumlah && <div style={{ fontSize: "8pt", color: "#444" }}>Output: {j.outputJumlah}</div>}
-                      </td>
-                      <td style={{ border: "1px solid #000", padding: "4px" }}>
-                        {j.fileName ? (
-                          <div>
-                            📄{" "}
-                            <a
-                              href={j.fileUrl || (j.filePath ? `/uploads/${j.filePath.split(/[/\\]/).pop()}` : `/uploads/${j.fileName}`)}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold" }}
-                            >
-                              {j.fileName}
-                            </a>{" "}
-                            {j.fileSize ? `(${j.fileSize})` : ""}
-                          </div>
-                        ) : (j.fotoUrl ? (
-                          <div>
-                            📸{" "}
-                            <a
-                              href={j.fileUrl || j.fotoUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold" }}
-                            >
-                              Foto Dokumentasi
-                            </a>
-                          </div>
-                        ) : "-")}
-                      </td>
-                      <td style={{ border: "1px solid #000", padding: "4px", fontSize: "8pt", wordBreak: "break-all" }}>
-                        {j.linkUrl ? (
-                          <a href={j.linkUrl} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
-                            {j.linkUrl}
-                          </a>
-                        ) : (j.fileUrl ? (
-                          <a href={j.fileUrl} target="_blank" rel="noreferrer" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
-                            {j.fileUrl}
-                          </a>
-                        ) : "-")}
-                      </td>
-                    </tr>
-                  ))}
+                  {journals.filter(j => Boolean(j.fileName || j.linkUrl || j.fotoUrl || j.fileUrl)).map((j, idx) => {
+                    const isImg = Boolean(
+                      j.fotoUrl ||
+                      (j.evidenceType === "image") ||
+                      (j.fileUrl && /\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(j.fileUrl)) ||
+                      (j.fileName && /\.(jpg|jpeg|png|webp|gif)$/i.test(j.fileName))
+                    );
+                    const effectiveFoto = j.fotoUrl || (isImg ? j.fileUrl : "");
+                    const effectiveFile = j.fileUrl || (j.filePath ? `/uploads/${j.filePath.split(/[/\\]/).pop()}` : (j.fileName ? `/uploads/${j.fileName}` : ""));
+
+                    return (
+                      <tr key={j.id || idx}>
+                        <td style={{ textAlign: "center", border: "1px solid #000", padding: "4px" }}>{idx + 1}</td>
+                        <td style={{ textAlign: "center", border: "1px solid #000", padding: "4px" }}>{j.tanggal}</td>
+                        <td style={{ border: "1px solid #000", padding: "4px" }}>
+                          <strong>{j.aktivitas}</strong>
+                          {j.outputJumlah && <div style={{ fontSize: "8pt", color: "#444" }}>Output: {j.outputJumlah}</div>}
+                        </td>
+                        <td style={{ border: "1px solid #000", padding: "4px" }}>
+                          {j.fileName && !isImg ? (
+                            <div>
+                              📄{" "}
+                              <span className="print-only-text" style={{ display: "none", fontWeight: "bold" }}>
+                                {j.fileName}
+                              </span>
+                              <a
+                                href={effectiveFile}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="preview-only-link"
+                                style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold" }}
+                              >
+                                {j.fileName}
+                              </a>{" "}
+                              {j.fileSize ? `(${j.fileSize})` : ""}
+                            </div>
+                          ) : isImg ? (
+                            <div>
+                              📸{" "}
+                              <span className="print-only-text" style={{ display: "none", fontWeight: "bold" }}>
+                                Foto Dokumentasi
+                              </span>
+                              <a
+                                href={effectiveFoto || effectiveFile}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="preview-only-link"
+                                style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold" }}
+                              >
+                                Foto Dokumentasi
+                              </a>
+                            </div>
+                          ) : "-"}
+                        </td>
+                        <td style={{ border: "1px solid #000", padding: "4px", fontSize: "8pt", wordBreak: "break-all" }}>
+                          {j.linkUrl && !j.linkUrl.includes("/uploads/") ? (
+                            <>
+                              <a href={j.linkUrl} target="_blank" rel="noreferrer" className="preview-only-link" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
+                                {j.linkUrl}
+                              </a>
+                              <span className="print-only-text" style={{ display: "none" }}>
+                                {j.linkUrl}
+                              </span>
+                            </>
+                          ) : (effectiveFile || effectiveFoto) ? (
+                            <>
+                              <a href={effectiveFile || effectiveFoto} target="_blank" rel="noreferrer" className="preview-only-link" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
+                                {effectiveFile || effectiveFoto}
+                              </a>
+                              <span className="print-only-text" style={{ display: "none", color: "#333333", fontStyle: "italic" }}>
+                                Terlampir dalam berkas fisik / ZIP
+                              </span>
+                            </>
+                          ) : "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

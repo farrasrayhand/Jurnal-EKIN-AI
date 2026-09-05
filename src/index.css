@@ -1091,6 +1091,10 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     display: block !important;
   }
 
+  a[href]:after {
+    content: none !important;
+  }
+
   .app-container {
     max-width: 100% !important;
     padding: 0 !important;

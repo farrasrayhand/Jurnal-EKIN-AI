@@ -2012,13 +2012,15 @@ export async function handleIncomingText(botInstance, msg) {
       journalPayload.fileUrl = firstAtt.fileUrl || "";
       if (firstAtt.type === "image") {
         journalPayload.evidenceType = "image";
-        journalPayload.fotoPath = firstAtt.filePath;
-        journalPayload.fileName = firstAtt.fileName;
+        journalPayload.fotoPath = firstAtt.filePath || "";
+        journalPayload.fotoUrl = firstAtt.fileUrl || "";
+        journalPayload.fileName = firstAtt.fileName || "";
+        journalPayload.fileSize = firstAtt.fileSize || "";
       } else {
         journalPayload.evidenceType = "document";
-        journalPayload.filePath = firstAtt.filePath;
-        journalPayload.fileName = firstAtt.fileName;
-        journalPayload.fileSize = firstAtt.fileSize;
+        journalPayload.filePath = firstAtt.filePath || "";
+        journalPayload.fileName = firstAtt.fileName || "";
+        journalPayload.fileSize = firstAtt.fileSize || "";
       }
     }
 
@@ -2556,6 +2558,7 @@ async function handleIncomingAttachment(botInstance, msg, item) {
         filePath: savedFilePath,
         fileName: photoFileName,
         fileUrl: photoFileUrl,
+        fotoUrl: photoFileUrl,
         fileSize: bestPhoto.file_size ? `${(bestPhoto.file_size / 1024).toFixed(0)} KB` : "",
         ext
       };

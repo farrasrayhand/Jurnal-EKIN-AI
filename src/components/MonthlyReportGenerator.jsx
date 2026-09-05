@@ -84,8 +84,18 @@ export default function MonthlyReportGenerator({
     // Ekstrak berkas fisik terupload & berikan penomoran lampiran (lampiran-1, lampiran-2, dst.)
     let physicalCount = 0;
     const enrichedJournals = filteredJournals.map(j => {
+      // Normalisasi apakah foto ada di fotoUrl atau tersimpan di fileUrl/fileName dengan format gambar
+      const isImg = Boolean(
+        j.fotoUrl ||
+        (j.evidenceType === "image") ||
+        (j.fileUrl && /\.(jpg|jpeg|png|webp|gif)($|\?)/i.test(j.fileUrl)) ||
+        (j.fileName && /\.(jpg|jpeg|png|webp|gif)$/i.test(j.fileName)) ||
+        (j.filePath && /\.(jpg|jpeg|png|webp|gif)$/i.test(j.filePath))
+      );
+      const effectiveFotoUrl = j.fotoUrl || (isImg ? (j.fileUrl || (j.filePath ? `/uploads/${j.filePath.split(/[/\\]/).pop()}` : (j.fileName ? `/uploads/${j.fileName}` : ""))) : "");
+
       const hasPhysical = Boolean(
-        (j.fotoUrl && (j.fotoUrl.startsWith("data:") || j.fotoUrl.includes("/uploads/"))) ||
+        (effectiveFotoUrl && (effectiveFotoUrl.startsWith("data:") || effectiveFotoUrl.includes("/uploads/"))) ||
         j.filePath ||
         j.fileName ||
         (j.fileUrl && j.fileUrl.includes("/uploads/"))
@@ -102,11 +112,13 @@ export default function MonthlyReportGenerator({
           .replace(/[^a-z0-9]/g, "_")
           .replace(/_+/g, "_")
           .replace(/^_|_$/g, "");
-        const ext = j.fotoUrl ? ".jpg" : (j.fileName ? (j.fileName.match(/\.[a-zA-Z0-9]+$/)?.[0] || ".pdf") : ".pdf");
+        const ext = isImg ? ".jpg" : (j.fileName ? (j.fileName.match(/\.[a-zA-Z0-9]+$/)?.[0] || ".pdf") : ".pdf");
         trackableName = `lampiran-${lampiranIndex}_${monthObj.name}_${selectedYear}_${cleanDate}_${safeTitle}${ext}`;
       }
       return {
         ...j,
+        isImg,
+        effectiveFotoUrl,
         hasPhysical,
         lampiranIndex,
         trackableName
@@ -114,7 +126,7 @@ export default function MonthlyReportGenerator({
     });
 
     // Ekstrak foto dokumentasi
-    const photoEvidences = enrichedJournals.filter(j => j.fotoUrl);
+    const photoEvidences = enrichedJournals.filter(j => j.effectiveFotoUrl);
 
     // Hitung rekap per RHK
     const rhkStats = rhkList.map(rhk => {
@@ -723,10 +735,10 @@ export default function MonthlyReportGenerator({
                     </td>
                     <td style={{ border: "1px solid #000000", padding: "6px", textAlign: "center", verticalAlign: "middle" }}>
                       {/* 1. Foto Dokumentasi Terupload */}
-                      {jrn.fotoUrl && (
-                        <div style={{ marginBottom: "5px" }}>
+                      {jrn.effectiveFotoUrl ? (
+                        <div style={{ marginBottom: "3px" }}>
                           <img 
-                            src={jrn.fotoUrl} 
+                            src={jrn.effectiveFotoUrl} 
                             alt={`Foto kegiatan ${idx + 1}`} 
                             style={{ 
                               width: "85px", 
@@ -737,14 +749,35 @@ export default function MonthlyReportGenerator({
                               display: "block",
                               margin: "0 auto 2px auto"
                             }} 
+                            onError={(e) => { 
+                              e.target.style.display = 'none'; 
+                              const fallback = e.target.parentElement.querySelector('.img-missing-box');
+                              if (fallback) fallback.style.display = 'block';
+                            }}
                           />
+                          <div 
+                            className="img-missing-box" 
+                            style={{ 
+                              display: "none", 
+                              width: "85px", 
+                              padding: "4px 2px", 
+                              margin: "0 auto 2px auto", 
+                              border: "1px dashed #64748b", 
+                              borderRadius: "2px", 
+                              fontSize: "6.5pt", 
+                              color: "#475569" 
+                            }}
+                          >
+                            📷 Foto Dokumentasi
+                          </div>
                           {jrn.lampiranIndex > 0 && (
                             <div style={{ fontSize: "6.8pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
                               📎 Lampiran {jrn.lampiranIndex}
                             </div>
                           )}
+                          {/* Saat Preview Web Saja: Tombol Buka Foto (Disembunyikan saat cetak) */}
                           <a 
-                            href={jrn.fileUrl || jrn.fotoUrl}
+                            href={jrn.effectiveFotoUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="preview-only-link"
@@ -754,19 +787,17 @@ export default function MonthlyReportGenerator({
                             🔗 Buka Foto
                           </a>
                         </div>
-                      )}
-
-                      {/* 2. Berkas Dokumen Fisik non-foto Terupload */}
-                      {(!jrn.fotoUrl && (jrn.fileName || jrn.fileUrl || jrn.filePath)) && (
+                      ) : (jrn.hasPhysical && (jrn.fileName || jrn.fileUrl || jrn.filePath)) ? (
+                        /* 2. Berkas Dokumen Fisik non-foto Terupload (PDF, Docx, dsb.) */
                         <div style={{ fontSize: "7.5pt", color: "#334155", marginBottom: "4px" }}>
                           {jrn.lampiranIndex > 0 && (
                             <div style={{ fontSize: "7pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
                               📎 Lampiran {jrn.lampiranIndex}
                             </div>
                           )}
-                          {/* Saat Cetak: Tampilkan nama berkas tanpa hyperlink */}
+                          {/* Saat Cetak: Tampilkan nama berkas bersih tanpa hyperlink atau URL */}
                           <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000" }}>
-                            {jrn.trackableName || jrn.fileName}
+                            📄 {jrn.fileName || "Berkas Dokumen Terlampir"}
                           </div>
                           {/* Saat Preview Web: Tampilkan link berkas yang bisa diklik */}
                           <a 
@@ -775,17 +806,15 @@ export default function MonthlyReportGenerator({
                             rel="noreferrer"
                             className="preview-only-link"
                             style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold", display: "block", wordBreak: "break-all" }}
-                            title={jrn.trackableName || jrn.fileName}
+                            title={jrn.fileName || "Buka Berkas"}
                           >
-                            {jrn.trackableName || jrn.fileName || "Buka Berkas"}
+                            📄 {jrn.fileName || "Buka Berkas"}
                           </a>
-                          {jrn.fileSize && <span style={{ fontSize: "6.5pt", color: "#64748b", display: "block" }}>({jrn.fileSize})</span>}
+                          {jrn.fileSize && <span className="preview-only-link" style={{ fontSize: "6.5pt", color: "#64748b", display: "block" }}>({jrn.fileSize})</span>}
                         </div>
-                      )}
-
-                      {/* 3. Tautan Online / Drive (jika bukan berkas upload, "kalau link baru link aja") */}
-                      {(jrn.linkUrl && jrn.linkUrl !== jrn.fileUrl && !jrn.hasPhysical) ? (
-                        <div style={{ marginTop: jrn.fotoUrl ? "4px" : "0", fontSize: "7.5pt", lineHeight: "1.25" }}>
+                      ) : (jrn.linkUrl && jrn.linkUrl !== jrn.fileUrl && !jrn.hasPhysical) ? (
+                        /* 3. Tautan Online / Drive (jika bukan berkas upload) */
+                        <div style={{ marginTop: "2px", fontSize: "7.5pt", lineHeight: "1.25" }}>
                           {/* Saat Cetak: Tampilkan keterangan teks tanpa tautan biru */}
                           <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000" }}>
                             Tautan Online Bukti Eviden
@@ -822,7 +851,7 @@ export default function MonthlyReportGenerator({
                             {jrn.linkUrl || jrn.driveLink || jrn.link}
                           </div>
                         </div>
-                      ) : (!jrn.fotoUrl && !jrn.fileName && !jrn.fileUrl && !jrn.filePath && !jrn.linkUrl) && (
+                      ) : (!jrn.effectiveFotoUrl && !jrn.fileName && !jrn.fileUrl && !jrn.filePath && !jrn.linkUrl) && (
                         <span style={{ fontSize: "7.5pt", color: "#64748b", fontStyle: "italic" }}>Log Kegiatan</span>
                       )}
                     </td>
