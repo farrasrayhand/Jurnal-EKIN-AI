@@ -66,7 +66,10 @@ import {
   cleanupExpiredSessions,
   deleteJournalById,
   deleteUserById,
-  ONE_DAY_MS
+  ONE_DAY_MS,
+  getAccounts,
+  findUserById,
+  getJournals
 } from "./dbStore.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
 import { initDatabase, loadStoreFromDatabase, getDatabaseHealth, getActiveDbType } from "./dbAdapter.js";
@@ -994,19 +997,18 @@ const server = http.createServer(async (req, res) => {
     const userId = parsedUrl.searchParams.get("userId") || "";
     const gdriveLink = parsedUrl.searchParams.get("gdriveLink") || "";
 
-    let storeData = { accounts: [], journals: [] };
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        storeData = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-      } catch (e) {}
-    }
+    // Gunakan getStore() yang sudah di-cache (MySQL-aware) agar data akun selalu akurat
+    const liveAccounts = getAccounts();
+    const liveJournals = getJournals();
 
-    const targetUser = storeData.accounts?.find(a => a.id === userId || a.username === userId)
-      || storeData.accounts?.find(a => a.role !== "superadmin")
-      || storeData.accounts?.[0]
+    const targetUser = (userId
+      ? (liveAccounts.find(a => a.id === userId || a.username === userId))
+      : null)
+      || liveAccounts.find(a => a.role !== "superadmin")
+      || liveAccounts[0]
       || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
 
-    const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username);
+    const userJournals = liveJournals.filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username);
 
     if (pathname === "/api/reports/pdf") {
       generateMonthlyReportPdf({

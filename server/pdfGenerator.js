@@ -353,14 +353,6 @@ export function generateMonthlyReportPdf({
 
           const col5X = tableLeft + colW[0] + colW[1] + colW[2] + colW[3] + 4;
           const col5W = colW[4] - 8;
-          const baseAppUrl = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
-          let appUploadUrl = jrn.fileUrl || "";
-          if (!appUploadUrl) {
-            if (jrn.filePath) appUploadUrl = baseAppUrl ? `${baseAppUrl}/uploads/${path.basename(jrn.filePath)}` : `/uploads/${path.basename(jrn.filePath)}`;
-            else if (jrn.fotoPath) appUploadUrl = baseAppUrl ? `${baseAppUrl}/uploads/${path.basename(jrn.fotoPath)}` : `/uploads/${path.basename(jrn.fotoPath)}`;
-            else if (jrn.fileName) appUploadUrl = baseAppUrl ? `${baseAppUrl}/uploads/${jrn.fileName}` : `/uploads/${jrn.fileName}`;
-          }
-          const primaryLink = appUploadUrl || jrn.linkUrl || effectiveGdrive;
 
           const totalAttCount = (jrn.allAtts || []).length;
           const photoAtt = (jrn.allAtts || []).find(a => a.type === "photo") || (jrn.att?.type === "photo" ? jrn.att : null);
@@ -378,15 +370,29 @@ export function generateMonthlyReportPdf({
             } else {
               doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7.5);
               doc.text(`📎 ${jrn.lampiranLabel}`, col5X, tableY + 6, { width: col5W, align: "center" });
-              const shortTrackName = (jrn.trackableName || jrn.fileName || "berkas.pdf").slice(0, 24);
+              const shortTrackName = (jrn.trackableName || jrn.allAtts[0]?.fileName || jrn.fileName || "berkas.pdf").slice(0, 24);
               doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
               doc.text(shortTrackName, col5X, doc.y + 2, { width: col5W, align: "center" });
             }
           } else {
             const hasCustomLink = Boolean(jrn.linkUrl);
+            const hasFileRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fotoPath || jrn.fileName ||
+              (Array.isArray(jrn.attachments) && jrn.attachments.length > 0));
             if (hasCustomLink) {
-              doc.fillColor("#475569").font("Times-Roman").fontSize(7);
-              doc.text("Tautan Bukti Eviden", col5X, tableY + 8, { width: col5W, align: "center" });
+              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(7);
+              doc.text("🔗 Tautan Bukti Eviden", col5X, tableY + 6, {
+                width: col5W, align: "center",
+                link: jrn.linkUrl,
+                underline: true
+              });
+            } else if (hasFileRef) {
+              const rawRef = jrn.fileUrl || jrn.filePath || jrn.fotoPath || "";
+              const displayName = (jrn.fileName || (rawRef ? path.basename(rawRef.split("?")[0]) : ""))
+                || "Lampiran Terlampir";
+              doc.fillColor("#0f172a").font("Times-Bold").fontSize(7);
+              doc.text("📎 Lampiran", col5X, tableY + 6, { width: col5W, align: "center" });
+              doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
+              doc.text(displayName.slice(0, 24), col5X, doc.y + 2, { width: col5W, align: "center" });
             } else {
               doc.fillColor("#94a3b8").font("Times-Italic").fontSize(7);
               doc.text("-", col5X, tableY + 8, { width: col5W, align: "center" });
