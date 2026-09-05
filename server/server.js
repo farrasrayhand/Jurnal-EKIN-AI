@@ -1189,7 +1189,11 @@ startServer();
 
 // Penanganan Graceful Shutdown
 process.on("SIGTERM", async () => {
-  console.log("Menerima sinyal SIGTERM, menutup server & koneksi database...");
+  console.log("Menerima sinyal SIGTERM, menutup bot, server & koneksi database...");
+  try {
+    const { stopBot } = await import("./telegramBot.js");
+    await stopBot();
+  } catch (e) {}
   try {
     const { closePool } = await import("./mysqlAdapter.js");
     await closePool();
@@ -1198,7 +1202,11 @@ process.on("SIGTERM", async () => {
 });
 
 process.on("SIGINT", async () => {
-  console.log("Menerima sinyal SIGINT, menutup server & koneksi database...");
+  console.log("Menerima sinyal SIGINT, menutup bot, server & koneksi database...");
+  try {
+    const { stopBot } = await import("./telegramBot.js");
+    await stopBot();
+  } catch (e) {}
   try {
     const { closePool } = await import("./mysqlAdapter.js");
     await closePool();

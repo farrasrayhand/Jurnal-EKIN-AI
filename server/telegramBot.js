@@ -279,10 +279,26 @@ if (token && token.trim() && !token.includes("PASTE_HERE")) {
 
     // Tangani error polling tanpa membuat proses crash
     bot.on("polling_error", (error) => {
+      if (error.code === "ETELEGRAM" && (error.message || "").includes("409 Conflict")) {
+        console.warn("⚠️ [Telegram Polling Overlap (409)]: Terdeteksi proses redeploy/restart. Polling akan otomatis stabil setelah container lama berhenti.");
+        return;
+      }
       console.warn("⚠️ [Telegram Polling Error]:", error.code, error.message);
     });
   } catch (err) {
     console.error("❌ Gagal menginisialisasi bot Telegram:", err.message);
+  }
+}
+
+/**
+ * Hentikan Polling Bot Telegram saat Server Shutdown (Graceful Shutdown)
+ */
+export async function stopBot() {
+  if (bot && typeof bot.stopPolling === "function") {
+    try {
+      await bot.stopPolling();
+      console.log("🛑 [Telegram Bot] Polling bot dihentikan dengan aman.");
+    } catch (e) {}
   }
 }
 
