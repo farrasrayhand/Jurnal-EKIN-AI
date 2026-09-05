@@ -22,6 +22,8 @@ import {
   clearTelegramSession, 
   getJournals, 
   addJournal, 
+  addAttachmentToJournal,
+  normalizeJournalAttachments,
   getSettings,
   isProfileIncomplete,
   updateUserProfile,
@@ -1007,9 +1009,13 @@ export function handleCancel(botInstance, msg) {
     loginStates.delete(chatId);
     cancelled = true;
   }
+  if (pendingUploads.has(chatId)) {
+    pendingUploads.delete(chatId);
+    cancelled = true;
+  }
 
   if (cancelled) {
-    return botInstance.sendMessage(chatId, `ℹ️ Proses interaktif telah dibatalkan.`);
+    return botInstance.sendMessage(chatId, `ℹ️ Proses pengisian data / antrean berkas telah dibatalkan.`);
   }
   return botInstance.sendMessage(chatId, `ℹ️ Tidak ada proses pengisian data atau registrasi yang sedang berlangsung.`);
 }
@@ -1582,9 +1588,10 @@ export async function handleIncomingText(botInstance, msg) {
 
   try {
     // C. Cek apakah ada antrean berkas/foto yang menunggu uraian aktivitas
-    let attachedEvidence = null;
+    let attachedEvidences = [];
     if (pendingUploads.has(chatId)) {
-      attachedEvidence = pendingUploads.get(chatId);
+      const queued = pendingUploads.get(chatId);
+      attachedEvidences = Array.isArray(queued) ? queued : (queued ? [queued] : []);
       pendingUploads.delete(chatId);
     }
 
@@ -1602,6 +1609,7 @@ export async function handleIncomingText(botInstance, msg) {
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
 
+    const firstAtt = attachedEvidences[0] || null;
     const journalPayload = {
       userId: user.id,
       tanggal: dateStr,
@@ -1610,25 +1618,23 @@ export async function handleIncomingText(botInstance, msg) {
       aktivitasKasaran: cleanText,
       outputJumlah: polished.outputJumlah,
       catatan: polished.catatan,
-      linkUrl: detectedUrl || "",
+      linkUrl: detectedUrl || (firstAtt ? firstAtt.fileUrl : ""),
+      attachments: attachedEvidences,
       source: "telegram",
       aiEngine: polished.source
     };
 
-    if (attachedEvidence) {
-      journalPayload.fileUrl = attachedEvidence.fileUrl || "";
-      if (attachedEvidence.type === "image") {
+    if (firstAtt) {
+      journalPayload.fileUrl = firstAtt.fileUrl || "";
+      if (firstAtt.type === "image") {
         journalPayload.evidenceType = "image";
-        journalPayload.fotoPath = attachedEvidence.filePath;
-        journalPayload.fileName = attachedEvidence.fileName;
-      } else if (attachedEvidence.type === "document") {
+        journalPayload.fotoPath = firstAtt.filePath;
+        journalPayload.fileName = firstAtt.fileName;
+      } else {
         journalPayload.evidenceType = "document";
-        journalPayload.filePath = attachedEvidence.filePath;
-        journalPayload.fileName = attachedEvidence.fileName;
-        journalPayload.fileSize = attachedEvidence.fileSize;
-      }
-      if (!journalPayload.linkUrl && journalPayload.fileUrl) {
-        journalPayload.linkUrl = journalPayload.fileUrl;
+        journalPayload.filePath = firstAtt.filePath;
+        journalPayload.fileName = firstAtt.fileName;
+        journalPayload.fileSize = firstAtt.fileSize;
       }
     }
 
@@ -1643,19 +1649,25 @@ export async function handleIncomingText(botInstance, msg) {
       `📊 *Output / Hasil*: ${polished.outputJumlah}\n` +
       `💡 *Catatan*: ${polished.catatan}\n\n`;
 
-    if (newEntry.fotoPath) {
-      reply += `📸 *Bukti Foto*: Terlampir (${path.basename(newEntry.fotoPath)})\n`;
+    if (attachedEvidences.length === 1) {
+      const att = attachedEvidences[0];
+      reply += `📎 *Lampiran Eviden*: \`${att.fileName}\` (${att.fileSize || (att.type === "image" ? "Foto Dokumentasi" : "Dokumen")})\n`;
+      if (att.fileUrl) {
+        reply += `📎 *Tautan Berkas*: ${att.fileUrl}\n`;
+      }
+    } else if (attachedEvidences.length > 1) {
+      reply += `📎 *Lampiran Eviden*: *${attachedEvidences.length} Berkas Terunggah* (Otomatis tersusun ke arsip ZIP)\n`;
+      attachedEvidences.slice(0, 3).forEach((att, i) => {
+        reply += `   ${i + 1}. \`${att.fileName}\` (${att.type === "image" ? "Foto" : "Dokumen"})\n`;
+      });
+      if (attachedEvidences.length > 3) {
+        reply += `   ... dan ${attachedEvidences.length - 3} berkas lainnya\n`;
+      }
     }
-    if (newEntry.fileUrl) {
-      reply += `📎 *Tautan Berkas Aplikasi*: ${newEntry.fileUrl}\n`;
-    }
+
     if (detectedUrl) {
       reply += `🔗 *Tautan Drive*: ${detectedUrl}\n`;
-    }
-    if (newEntry.fileName && !newEntry.fotoPath) {
-      reply += `📄 *Bukti Dokumen*: \`${newEntry.fileName}\` (${newEntry.fileSize || "Tersimpan"})\n`;
-    }
-    if (newEntry.linkUrl) {
+    } else if (newEntry.linkUrl && !firstAtt) {
       reply += `🔗 *Tautan Eviden*: [Klik Google Drive](${newEntry.linkUrl})\n`;
     }
 
@@ -1765,6 +1777,187 @@ if (bot) {
     }
   });
 
+// Buffer untuk Media Group / Album Telegram (mediaGroupId -> { chatId, session, items: [], caption, timer })
+const mediaGroupBuffers = new Map();
+
+async function processMediaGroup(botInstance, mgId) {
+  const group = mediaGroupBuffers.get(mgId);
+  if (!group) return;
+  mediaGroupBuffers.delete(mgId);
+
+  const { chatId, session, items, caption } = group;
+  if (!items || items.length === 0) return;
+
+  // Kasus A: Album dikirim DENGAN caption uraian tugas
+  if (caption) {
+    const { url: detectedUrl, cleanText } = extractUrl(caption);
+    const polished = await polishJournalNode({
+      rawText: cleanText,
+      jabatan: session.user.jabatan,
+      unitKerja: session.user.unitKerja,
+      apiKey: session.user.personalApiKey || ""
+    });
+
+    const now = new Date().toISOString().slice(0, 10);
+    const primary = items[0];
+    const newEntry = addJournal({
+      userId: session.user.id,
+      tanggal: now,
+      jam: "08:00 - 16:00",
+      aktivitas: polished.aktivitas,
+      aktivitasKasaran: cleanText,
+      outputJumlah: polished.outputJumlah,
+      catatan: `Disertai ${items.length} berkas bukti dokumen/foto dokumentasi.`,
+      attachments: items,
+      linkUrl: detectedUrl || primary.fileUrl || "",
+      source: "telegram-album",
+      aiEngine: polished.source
+    });
+
+    let reply = `📸 *Album (${items.length} Berkas) & Jurnal Berhasil Disimpan!* ✨\n\n` +
+      `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
+      `📊 *Output*: ${polished.outputJumlah}\n` +
+      `🖼 *Bukti Lampiran*: *${items.length} Berkas* terunggah ke logbook.\n\n` +
+      `Ketik \`/laporan\` kapan pun untuk mengunduh laporan PDF & paket berkas ZIP lengkap.`;
+
+    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+  }
+
+  // Kasus B: Album dikirim TANPA caption
+  const userJournals = getJournals(session.userId);
+  const recent = userJournals.length > 0 ? userJournals[0] : null;
+  const isWithin30Min = recent && recent.createdAt && (Date.now() - new Date(recent.createdAt).getTime() < 30 * 60 * 1000);
+
+  if (recent && isWithin30Min) {
+    items.forEach(item => addAttachmentToJournal(recent.id, item));
+    const totalCount = (recent.attachments || []).length;
+    let reply = `📸 *${items.length} Berkas Berhasil Ditambahkan ke Jurnal!* ✅\n\n` +
+      `Seluruh berkas dilampirkan pada aktivitas:\n_${recent.aktivitas}_\n\n` +
+      `📌 *Total Lampiran Aktivitas Ini*: *${totalCount} Berkas*\n` +
+      `Semua berkas otomatis tersusun ke dalam paket ZIP laporan bulanan.`;
+    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+  }
+
+  // Simpan ke antrean pendingUploads
+  const queue = pendingUploads.get(chatId) || [];
+  queue.push(...items);
+  pendingUploads.set(chatId, queue);
+
+  return botInstance.sendMessage(
+    chatId,
+    `📸 *${items.length} Berkas Bukti Diterima (Total ${queue.length} berkas dalam antrean)!*\n\n` +
+    `Silakan ketik uraian kegiatan/pekerjaan Anda terkait berkas-berkas ini:`,
+    { parse_mode: "Markdown" }
+  );
+}
+
+async function handleIncomingAttachment(botInstance, msg, item) {
+  const chatId = msg.chat.id;
+  const session = getTelegramSession(chatId);
+  if (!session) return;
+
+  // 1. Jika pesan merupakan bagian dari media group (album foto/file)
+  if (msg.media_group_id) {
+    const mgId = msg.media_group_id;
+    let group = mediaGroupBuffers.get(mgId);
+    if (!group) {
+      group = {
+        chatId,
+        session,
+        items: [],
+        caption: msg.caption ? msg.caption.trim() : "",
+        timer: null
+      };
+      mediaGroupBuffers.set(mgId, group);
+    }
+    if (msg.caption && !group.caption) {
+      group.caption = msg.caption.trim();
+    }
+    group.items.push(item);
+
+    if (group.timer) clearTimeout(group.timer);
+    group.timer = setTimeout(() => {
+      processMediaGroup(botInstance, mgId);
+    }, 800);
+    return;
+  }
+
+  // 2. Berkas tunggal DENGAN caption uraian tugas
+  const rawCaption = msg.caption ? msg.caption.trim() : "";
+  if (rawCaption) {
+    const { url: detectedUrl, cleanText } = extractUrl(rawCaption);
+    const polished = await polishJournalNode({
+      rawText: cleanText,
+      jabatan: session.user.jabatan,
+      unitKerja: session.user.unitKerja,
+      apiKey: session.user.personalApiKey || ""
+    });
+
+    const now = new Date().toISOString().slice(0, 10);
+    const newEntry = addJournal({
+      userId: session.user.id,
+      tanggal: now,
+      jam: "08:00 - 16:00",
+      aktivitas: polished.aktivitas,
+      aktivitasKasaran: cleanText,
+      outputJumlah: polished.outputJumlah,
+      catatan: item.type === "image" ? "Disertai foto dokumentasi fisik lapangan." : `Disertai dokumen eviden ${item.fileName}.`,
+      attachments: [item],
+      linkUrl: detectedUrl || item.fileUrl || "",
+      source: item.type === "image" ? "telegram-photo" : "telegram-document",
+      aiEngine: polished.source
+    });
+
+    let reply = `✨ *Jurnal & Berkas Berhasil Disimpan ke Logbook!* ✨\n\n` +
+      `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
+      `📊 *Output*: ${polished.outputJumlah}\n` +
+      `📎 *Lampiran Eviden*: \`${item.fileName}\` (${item.fileSize || (item.type === "image" ? "Foto Dokumentasi" : "Dokumen")})\n`;
+
+    if (item.fileUrl) {
+      reply += `📎 *Tautan Berkas Aplikasi*: ${item.fileUrl}\n`;
+    }
+    if (detectedUrl) {
+      reply += `🔗 *Tautan Drive*: ${detectedUrl}\n`;
+    }
+
+    reply += `\nKetik \`/laporan\` kapan pun untuk mengunduh laporan PDF bulanan Anda.`;
+    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+  }
+
+  // 3. Berkas tunggal TANPA caption
+  const userJournals = getJournals(session.userId);
+  const recent = userJournals.length > 0 ? userJournals[0] : null;
+  const isWithin30Min = recent && recent.createdAt && (Date.now() - new Date(recent.createdAt).getTime() < 30 * 60 * 1000);
+
+  if (recent && isWithin30Min) {
+    addAttachmentToJournal(recent.id, item);
+    const totalCount = (recent.attachments || []).length;
+    let reply = `📎 *Berkas Berhasil Ditambahkan ke Jurnal!* ✅\n\n` +
+      `Berkas \`${item.fileName}\` dilampirkan pada aktivitas:\n_${recent.aktivitas}_\n\n` +
+      `📌 *Total Lampiran Aktivitas Ini*: *${totalCount} Berkas*\n` +
+      `Seluruh berkas otomatis disusun dan dinomori runtut pada paket ZIP laporan Anda.`;
+
+    if (item.fileUrl) {
+      reply += `\n📎 *Tautan Berkas*: ${item.fileUrl}`;
+    }
+
+    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+  }
+
+  // 4. Simpan ke antrean pendingUploads
+  const queue = pendingUploads.get(chatId) || [];
+  queue.push(item);
+  pendingUploads.set(chatId, queue);
+
+  let promptMsg = `📎 *Berkas Bukti Diterima (\`${item.fileName}\`)!*\n` +
+    `Saat ini tersimpan *${queue.length} berkas* dalam antrean.\n\n` +
+    `Silakan ketik uraian tugas/pekerjaan Anda terkait berkas ini:\n` +
+    `_Contoh: "rapat koordinasi evaluasi program dinas dan dokumentasi penyerahan berkas"_\n\n` +
+    `_(Kirim berkas tambahan lainnya jika ada, atau ketik /batal untuk membatalkan)_`;
+
+  return botInstance.sendMessage(chatId, promptMsg, { parse_mode: "Markdown" });
+}
+
   // Handler Foto Dokumentasi Kegiatan
   bot.on("photo", async (msg) => {
     const chatId = msg.chat.id;
@@ -1779,7 +1972,7 @@ if (bot) {
 
     try {
       const photos = msg.photo || [];
-      const bestPhoto = photos[photos.length - 1]; // Resolusi tertinggi
+      const bestPhoto = photos[photos.length - 1];
       let savedFilePath = "";
 
       try {
@@ -1788,106 +1981,24 @@ if (bot) {
         console.warn("Gagal mengunduh berkas foto fisik:", dlErr.message);
       }
 
-      const rawCaption = msg.caption ? msg.caption.trim() : "";
       const baseAppUrl = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
-      const photoFileName = savedFilePath ? path.basename(savedFilePath) : "foto_kegiatan.jpg";
+      const photoFileName = savedFilePath ? path.basename(savedFilePath) : `foto_${Date.now()}.jpg`;
       const photoFileUrl = savedFilePath ? (baseAppUrl ? `${baseAppUrl}/uploads/${photoFileName}` : `/uploads/${photoFileName}`) : "";
+      const ext = path.extname(photoFileName).toLowerCase() || ".jpg";
 
-      // Kasus 1: Foto dikirim DENGAN caption penjelasan tugas
-      if (rawCaption) {
-        const { url: detectedUrl, cleanText } = extractUrl(rawCaption);
-
-        const polished = await polishJournalNode({
-          rawText: cleanText,
-          jabatan: session.user.jabatan,
-          unitKerja: session.user.unitKerja,
-          apiKey: session.user.personalApiKey || ""
-        });
-
-        const now = new Date().toISOString().slice(0, 10);
-        addJournal({
-          userId: session.user.id,
-          tanggal: now,
-          jam: "08:00 - 16:00",
-          aktivitas: polished.aktivitas,
-          aktivitasKasaran: cleanText,
-          outputJumlah: polished.outputJumlah,
-          catatan: "Disertai foto dokumentasi fisik lapangan.",
-          fotoPath: savedFilePath,
-          fileName: photoFileName,
-          fileUrl: photoFileUrl,
-          evidenceType: "image",
-          linkUrl: detectedUrl || photoFileUrl,
-          source: "telegram-photo"
-        });
-
-        let reply = `📸 *Foto & Jurnal Berhasil Disimpan ke Logbook!* ✨\n\n` +
-          `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
-          `📊 *Output*: ${polished.outputJumlah}\n` +
-          `🖼 *Bukti Foto*: Terlampir di dokumen laporan.\n`;
-
-        if (photoFileUrl) {
-          reply += `📎 *Tautan Berkas Aplikasi*: ${photoFileUrl}\n`;
-        }
-        if (detectedUrl) {
-          reply += `🔗 *Tautan Drive*: ${detectedUrl}\n`;
-        }
-
-        reply += `\nKetik \`/laporan\` untuk melihat cetak PDF laporan bulanan Anda.`;
-
-        return bot.sendMessage(chatId, reply, { parse_mode: "Markdown" });
-      }
-
-      // Kasus 2: Foto dikirim TANPA caption
-      // Periksa apakah ada jurnal terbaru pengguna dalam 30 menit terakhir
-      const userJournals = getJournals(session.userId);
-      const recent = userJournals.length > 0 ? userJournals[0] : null;
-
-      if (recent && !recent.fotoPath) {
-        recent.fotoPath = savedFilePath;
-        recent.evidenceType = "image";
-        recent.fileName = photoFileName;
-        recent.fileUrl = photoFileUrl;
-        if (!recent.linkUrl && photoFileUrl) {
-          recent.linkUrl = photoFileUrl;
-        }
-        const store = getStore();
-        saveStore(store);
-
-        let reply = `📸 *Foto Berhasil Ditautkan!* ✅\n\n` +
-          `Foto ini telah dilampirkan sebagai bukti dukung fisik untuk aktivitas terbaru Anda:\n` +
-          `_${recent.aktivitas}_\n\n`;
-
-        if (photoFileUrl) {
-          reply += `📎 *Tautan Berkas Aplikasi*: ${photoFileUrl}\n\n`;
-        }
-
-        reply += `Foto akan otomatis tampil pada tabel dokumen laporan PDF bulanan Anda.`;
-
-        return bot.sendMessage(chatId, reply, { parse_mode: "Markdown" });
-      }
-
-      // Jika belum ada jurnal, simpan ke antrean sementara
-      pendingUploads.set(chatId, {
+      const item = {
         type: "image",
         filePath: savedFilePath,
         fileName: photoFileName,
         fileUrl: photoFileUrl,
-        createdAt: Date.now()
-      });
+        fileSize: bestPhoto.file_size ? `${(bestPhoto.file_size / 1024).toFixed(0)} KB` : "",
+        ext
+      };
 
-      let promptMsg = `📸 *Foto Bukti Diterima!*\n\n`;
-      if (photoFileUrl) {
-        promptMsg += `📎 *Tautan Berkas Aplikasi*: ${photoFileUrl}\n\n`;
-      }
-      promptMsg += `Silakan ketik uraian kegiatan/pekerjaan Anda terkait foto ini:\n` +
-        `_Contoh: "rapat penyusunan sop kepegawaian di ruang rapat dinas"_\n\n` +
-        `_(Ketik /batal untuk membatalkan)_`;
-
-      return bot.sendMessage(chatId, promptMsg, { parse_mode: "Markdown" });
+      await handleIncomingAttachment(bot, msg, item);
     } catch (err) {
       console.error("Gagal memproses foto:", err);
-      return bot.sendMessage(chatId, `❌ Terjadi kendala saat memproses foto: ${err.message}`);
+      bot.sendMessage(chatId, `❌ Terjadi kendala saat memproses foto: ${err.message}`);
     }
   });
 
@@ -1919,106 +2030,22 @@ if (bot) {
       const baseAppUrl = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
       const storedFileName = savedFilePath ? path.basename(savedFilePath) : cleanFileName;
       const docFileUrl = savedFilePath ? (baseAppUrl ? `${baseAppUrl}/uploads/${storedFileName}` : `/uploads/${storedFileName}`) : "";
+      const ext = path.extname(cleanFileName).toLowerCase() || ".pdf";
+      const isImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext);
 
-      const rawCaption = msg.caption ? msg.caption.trim() : "";
-
-      // Kasus 1: Dokumen DENGAN caption
-      if (rawCaption) {
-        const { url: detectedUrl, cleanText } = extractUrl(rawCaption);
-
-        const polished = await polishJournalNode({
-          rawText: cleanText,
-          jabatan: session.user.jabatan,
-          unitKerja: session.user.unitKerja,
-          apiKey: session.user.personalApiKey || ""
-        });
-
-        const now = new Date().toISOString().slice(0, 10);
-        addJournal({
-          userId: session.user.id,
-          tanggal: now,
-          jam: "08:00 - 16:00",
-          aktivitas: polished.aktivitas,
-          aktivitasKasaran: cleanText,
-          outputJumlah: polished.outputJumlah,
-          catatan: `Disertai dokumen eviden ${cleanFileName}.`,
-          filePath: savedFilePath,
-          fileName: cleanFileName,
-          fileUrl: docFileUrl,
-          fileSize: fileSize,
-          evidenceType: "document",
-          linkUrl: detectedUrl || docFileUrl,
-          source: "telegram-document"
-        });
-
-        let reply = `📄 *Berkas Dokumen & Jurnal Berhasil Disimpan!* ✨\n\n` +
-          `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
-          `📊 *Output*: ${polished.outputJumlah}\n` +
-          `📎 *Nama Berkas*: \`${cleanFileName}\` (${fileSize})\n`;
-
-        if (docFileUrl) {
-          reply += `📎 *Tautan Berkas Aplikasi*: ${docFileUrl}\n`;
-        }
-        if (detectedUrl) {
-          reply += `🔗 *Tautan Drive*: ${detectedUrl}\n`;
-        }
-
-        reply += `\nKetik \`/laporan\` untuk mencetak dokumen laporan bulanan Anda.`;
-
-        return bot.sendMessage(chatId, reply, { parse_mode: "Markdown" });
-      }
-
-      // Kasus 2: Dokumen TANPA caption
-      const userJournals = getJournals(session.userId);
-      const recent = userJournals.length > 0 ? userJournals[0] : null;
-
-      if (recent && !recent.fileName) {
-        recent.fileName = cleanFileName;
-        recent.fileSize = fileSize;
-        recent.filePath = savedFilePath;
-        recent.fileUrl = docFileUrl;
-        if (!recent.linkUrl && docFileUrl) {
-          recent.linkUrl = docFileUrl;
-        }
-        recent.evidenceType = "document";
-        const store = getStore();
-        saveStore(store);
-
-        let reply = `📄 *Berkas Berhasil Ditautkan!* ✅\n\n` +
-          `Berkas \`${cleanFileName}\` telah dilampirkan sebagai dokumen eviden untuk aktivitas:\n` +
-          `_${recent.aktivitas}_\n\n`;
-
-        if (docFileUrl) {
-          reply += `📎 *Tautan Berkas Aplikasi*: ${docFileUrl}\n\n`;
-        }
-
-        reply += `Nama berkas akan tercantum pada tabel laporan resmi Anda.`;
-
-        return bot.sendMessage(chatId, reply, { parse_mode: "Markdown" });
-      }
-
-      // Simpan ke antrean sementara
-      pendingUploads.set(chatId, {
-        type: "document",
+      const item = {
+        type: isImg ? "image" : "document",
         filePath: savedFilePath,
         fileName: cleanFileName,
         fileUrl: docFileUrl,
-        fileSize: fileSize,
-        createdAt: Date.now()
-      });
+        fileSize,
+        ext
+      };
 
-      let promptMsg = `📄 *Berkas Dokumen Diterima (\`${cleanFileName}\`)!*\n\n`;
-      if (docFileUrl) {
-        promptMsg += `📎 *Tautan Berkas Aplikasi*: ${docFileUrl}\n\n`;
-      }
-      promptMsg += `Silakan ketik uraian tugas/pekerjaan Anda terkait dokumen ini:\n` +
-        `_Contoh: "penyusunan draf surat keputusan pembentukan tim spbe dinas"_\n\n` +
-        `_(Ketik /batal untuk membatalkan)_`;
-
-      return bot.sendMessage(chatId, promptMsg, { parse_mode: "Markdown" });
+      await handleIncomingAttachment(bot, msg, item);
     } catch (err) {
       console.error("Gagal memproses dokumen:", err);
-      return bot.sendMessage(chatId, `❌ Terjadi kendala saat memproses berkas dokumen: ${err.message}`);
+      bot.sendMessage(chatId, `❌ Terjadi kendala saat memproses berkas dokumen: ${err.message}`);
     }
   });
 }

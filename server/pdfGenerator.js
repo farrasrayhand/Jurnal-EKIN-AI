@@ -18,107 +18,124 @@ const NAMA_BULAN = [
 /**
  * Menemukan file fisik eviden dari sebuah entri jurnal jika diunggah ke sistem
  */
-export function resolveJournalAttachment(jrn, uploadsDir = DEFAULT_UPLOADS_DIR) {
-  if (!jrn) return { hasPhysicalFile: false };
+function resolveSingleAttachmentItem(item, uploadsDir) {
+  if (!item) return null;
 
-  // 1. Cek fotoPath langsung
-  if (jrn.fotoPath) {
-    let resolved = jrn.fotoPath;
-    if (!path.isAbsolute(resolved)) {
-      resolved = path.resolve(uploadsDir, resolved);
-    }
-    if (fs.existsSync(resolved)) {
-      const ext = path.extname(resolved).toLowerCase() || ".jpg";
-      return {
-        hasPhysicalFile: true,
-        type: "photo",
-        filePath: resolved,
-        fileName: path.basename(resolved),
-        ext
-      };
-    }
-  }
-
-  // 2. Cek filePath dokumen
-  if (jrn.filePath) {
-    let resolved = jrn.filePath;
+  // 1. Cek targetPath (filePath atau fotoPath)
+  let targetPath = item.filePath || item.fotoPath || "";
+  if (targetPath) {
+    let resolved = targetPath;
     if (!path.isAbsolute(resolved)) {
       resolved = path.resolve(uploadsDir, resolved);
     }
     if (fs.existsSync(resolved)) {
       const ext = path.extname(resolved).toLowerCase() || ".pdf";
+      const isImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext);
       return {
         hasPhysicalFile: true,
-        type: [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? "photo" : "document",
+        type: item.type === "image" || isImg ? "photo" : "document",
         filePath: resolved,
-        fileName: jrn.fileName || path.basename(resolved),
-        ext
+        fileName: item.fileName || path.basename(resolved),
+        ext,
+        fileUrl: item.fileUrl || ""
       };
     }
   }
 
-  // 3. Cek fotoUrl (bisa base64 data URI atau URL /uploads/...)
-  if (jrn.fotoUrl && typeof jrn.fotoUrl === "string") {
-    if (jrn.fotoUrl.startsWith("data:")) {
-      const extMatch = jrn.fotoUrl.match(/^data:image\/([a-zA-Z0-9]+);base64,/);
-      const ext = extMatch ? `.${extMatch[1] === "jpeg" ? "jpg" : extMatch[1]}` : ".jpg";
-      const base64Clean = jrn.fotoUrl.replace(/^data:[^;]+;base64,/, "");
+  // 2. Cek base64 data URI di fotoUrl atau dataUrl
+  const dataCandidate = item.fotoUrl || item.dataUrl || "";
+  if (typeof dataCandidate === "string" && dataCandidate.startsWith("data:")) {
+    const extMatch = dataCandidate.match(/^data:image\/([a-zA-Z0-9]+);base64,/);
+    const ext = extMatch ? `.${extMatch[1] === "jpeg" ? "jpg" : extMatch[1]}` : ".jpg";
+    const base64Clean = dataCandidate.replace(/^data:[^;]+;base64,/, "");
+    return {
+      hasPhysicalFile: true,
+      type: "photo",
+      base64Data: base64Clean,
+      fileName: item.fileName || `foto_kegiatan${ext}`,
+      ext,
+      fileUrl: item.fileUrl || ""
+    };
+  }
+
+  // 3. Cek fileUrl / fotoUrl yang memuat /uploads/
+  const urlCandidate = item.fileUrl || item.fotoUrl || "";
+  if (typeof urlCandidate === "string" && urlCandidate.includes("/uploads/")) {
+    const bName = path.basename(urlCandidate.split("?")[0]);
+    const candidate = path.join(uploadsDir, bName);
+    if (fs.existsSync(candidate)) {
+      const ext = path.extname(candidate).toLowerCase() || ".pdf";
+      const isImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext);
       return {
         hasPhysicalFile: true,
-        type: "photo",
-        base64Data: base64Clean,
-        fileName: jrn.fileName || `foto_kegiatan${ext}`,
-        ext
+        type: isImg ? "photo" : "document",
+        filePath: candidate,
+        fileName: item.fileName || bName,
+        ext,
+        fileUrl: item.fileUrl || urlCandidate
       };
     }
-    if (jrn.fotoUrl.includes("/uploads/")) {
-      const bName = path.basename(jrn.fotoUrl.split("?")[0]);
-      const candidate = path.join(uploadsDir, bName);
-      if (fs.existsSync(candidate)) {
-        const ext = path.extname(candidate).toLowerCase() || ".jpg";
-        return {
-          hasPhysicalFile: true,
-          type: "photo",
-          filePath: candidate,
-          fileName: jrn.fileName || bName,
-          ext
-        };
+  }
+
+  // 4. Cek fileName di folder uploadsDir
+  if (item.fileName && typeof item.fileName === "string") {
+    const candidate = path.join(uploadsDir, path.basename(item.fileName));
+    if (fs.existsSync(candidate)) {
+      const ext = path.extname(candidate).toLowerCase() || ".pdf";
+      const isImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext);
+      return {
+        hasPhysicalFile: true,
+        type: isImg ? "photo" : "document",
+        filePath: candidate,
+        fileName: item.fileName,
+        ext,
+        fileUrl: item.fileUrl || ""
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Menyelesaikan seluruh berkas eviden/lampiran fisik terkait jurnal (Multi-Attachment)
+ */
+export function resolveAllJournalAttachments(jrn, uploadsDir = DEFAULT_UPLOADS_DIR) {
+  if (!jrn) return [];
+  const results = [];
+  const seenPaths = new Set();
+
+  // 1. Jika jurnal memiliki properti attachments (array)
+  if (Array.isArray(jrn.attachments) && jrn.attachments.length > 0) {
+    for (const att of jrn.attachments) {
+      const resolved = resolveSingleAttachmentItem(att, uploadsDir);
+      if (resolved && resolved.hasPhysicalFile) {
+        const key = resolved.filePath || resolved.fileName || resolved.fileUrl;
+        if (!seenPaths.has(key)) {
+          seenPaths.add(key);
+          results.push(resolved);
+        }
       }
     }
   }
 
-  // 4. Cek fileUrl
-  if (jrn.fileUrl && typeof jrn.fileUrl === "string" && jrn.fileUrl.includes("/uploads/")) {
-    const bName = path.basename(jrn.fileUrl.split("?")[0]);
-    const candidate = path.join(uploadsDir, bName);
-    if (fs.existsSync(candidate)) {
-      const ext = path.extname(candidate).toLowerCase() || ".pdf";
-      return {
-        hasPhysicalFile: true,
-        type: [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? "photo" : "document",
-        filePath: candidate,
-        fileName: jrn.fileName || bName,
-        ext
-      };
+  // 2. Fallback jika attachments array kosong, cari dari properti legacy jurnal langsung
+  if (results.length === 0) {
+    const legacyResolved = resolveSingleAttachmentItem(jrn, uploadsDir);
+    if (legacyResolved && legacyResolved.hasPhysicalFile) {
+      results.push(legacyResolved);
     }
   }
 
-  // 5. Cek fileName di folder uploadsDir
-  if (jrn.fileName && typeof jrn.fileName === "string") {
-    const candidate = path.join(uploadsDir, path.basename(jrn.fileName));
-    if (fs.existsSync(candidate)) {
-      const ext = path.extname(candidate).toLowerCase() || ".pdf";
-      return {
-        hasPhysicalFile: true,
-        type: [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? "photo" : "document",
-        filePath: candidate,
-        fileName: jrn.fileName,
-        ext
-      };
-    }
-  }
+  return results;
+}
 
-  return { hasPhysicalFile: false };
+/**
+ * Mengambil lampiran pertama (untuk kebutuhan single view / thumbnail)
+ */
+export function resolveJournalAttachment(jrn, uploadsDir = DEFAULT_UPLOADS_DIR) {
+  const all = resolveAllJournalAttachments(jrn, uploadsDir);
+  return all.length > 0 ? all[0] : { hasPhysicalFile: false };
 }
 
 /**
@@ -218,10 +235,11 @@ export function generateMonthlyReportPdf({
 
       let physicalCount = 0;
       const enrichedJournals = filtered.map(jrn => {
-        const att = resolveJournalAttachment(jrn, uploadsDir);
+        const atts = resolveAllJournalAttachments(jrn, uploadsDir);
         let lampiranIndex = 0;
         let trackableName = "";
-        if (att.hasPhysicalFile) {
+        let lampiranLabel = "";
+        if (atts.length > 0) {
           physicalCount++;
           lampiranIndex = physicalCount;
           const cleanDate = (jrn.tanggal || "tgl").replace(/[^0-9-]/g, "");
@@ -231,10 +249,23 @@ export function generateMonthlyReportPdf({
             .replace(/[^a-z0-9]/g, "_")
             .replace(/_+/g, "_")
             .replace(/^_|_$/g, "");
-          const ext = att.ext?.startsWith(".") ? att.ext : `.${att.ext || "pdf"}`;
-          trackableName = `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+          if (atts.length === 1) {
+            const ext = atts[0].ext?.startsWith(".") ? atts[0].ext : `.${atts[0].ext || "pdf"}`;
+            trackableName = `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+            lampiranLabel = `Lampiran ${lampiranIndex}`;
+          } else {
+            trackableName = `lampiran-${lampiranIndex}.1_${cleanDate}_${safeTitle}${atts[0].ext || ".pdf"}`;
+            lampiranLabel = `${atts.length} Berkas (Lampiran ${lampiranIndex}.1 - ${lampiranIndex}.${atts.length})`;
+          }
         }
-        return { ...jrn, att, lampiranIndex, trackableName };
+        return {
+          ...jrn,
+          att: atts[0] || { hasPhysicalFile: false },
+          allAtts: atts,
+          lampiranIndex,
+          trackableName,
+          lampiranLabel
+        };
       });
 
       if (enrichedJournals.length === 0) {
@@ -251,8 +282,8 @@ export function generateMonthlyReportPdf({
           const fullUraian = taskText + catText;
 
           const textHeight = doc.heightOfString(fullUraian, { width: colW[2] - 10 });
-          const hasPhoto = jrn.att?.hasPhysicalFile && jrn.att.type === "photo";
-          const hasDocFile = jrn.att?.hasPhysicalFile && jrn.att.type !== "photo";
+          const hasPhoto = (jrn.allAtts || []).some(a => a.type === "photo");
+          const hasDocFile = (jrn.allAtts || []).some(a => a.type !== "photo");
           const minHeight = hasPhoto ? 58 : (hasDocFile ? 42 : 32);
           const rowH = Math.max(minHeight, textHeight + 12);
 
@@ -304,25 +335,30 @@ export function generateMonthlyReportPdf({
           }
           const primaryLink = appUploadUrl || jrn.linkUrl || effectiveGdrive;
 
-          if (jrn.att?.hasPhysicalFile && jrn.att.type === "photo") {
-            const imgSource = jrn.att.filePath || (jrn.att.base64Data ? Buffer.from(jrn.att.base64Data, "base64") : null);
-            let renderedThumb = false;
-            if (imgSource) {
-              try { doc.image(imgSource, col5X + 3, tableY + 4, { fit: [col5W - 6, 32], align: "center", valign: "center" }); renderedThumb = true; } catch (e) { renderedThumb = false; }
+          const totalAttCount = (jrn.allAtts || []).length;
+          const photoAtt = (jrn.allAtts || []).find(a => a.type === "photo") || (jrn.att?.type === "photo" ? jrn.att : null);
+
+          if (totalAttCount > 0) {
+            if (photoAtt) {
+              const imgSource = photoAtt.filePath || (photoAtt.base64Data ? Buffer.from(photoAtt.base64Data, "base64") : null);
+              let renderedThumb = false;
+              if (imgSource) {
+                try { doc.image(imgSource, col5X + 3, tableY + 4, { fit: [col5W - 6, 30], align: "center", valign: "center" }); renderedThumb = true; } catch (e) { renderedThumb = false; }
+              }
+              const labelY = renderedThumb ? tableY + 36 : tableY + 6;
+              doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7);
+              doc.text(`📎 ${jrn.lampiranLabel}`, col5X, labelY, { width: col5W, align: "center" });
+              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
+              doc.text(totalAttCount > 1 ? `🔗 Buka ${totalAttCount} Berkas` : "🔗 Buka Foto", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
+            } else {
+              doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7.5);
+              doc.text(`📎 ${jrn.lampiranLabel}`, col5X, tableY + 6, { width: col5W, align: "center" });
+              const shortTrackName = (jrn.trackableName || jrn.fileName || "berkas.pdf").slice(0, 18);
+              doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
+              doc.text(shortTrackName, col5X, doc.y + 1, { width: col5W, align: "center" });
+              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
+              doc.text(totalAttCount > 1 ? `🔗 Buka ${totalAttCount} Berkas` : "🔗 Buka Berkas", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
             }
-            const labelY = renderedThumb ? tableY + 38 : tableY + 6;
-            doc.fillColor("#0f172a").font("Times-Bold").fontSize(7);
-            doc.text(`📎 Lampiran ${jrn.lampiranIndex}`, col5X, labelY, { width: col5W, align: "center" });
-            doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
-            doc.text("🔗 Buka Foto", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
-          } else if (jrn.att?.hasPhysicalFile) {
-            doc.fillColor("#0f172a").font("Times-Bold").fontSize(7.5);
-            doc.text(`📎 Lampiran ${jrn.lampiranIndex}`, col5X, tableY + 6, { width: col5W, align: "center" });
-            const shortTrackName = (jrn.trackableName || jrn.fileName || "berkas.pdf").slice(0, 18);
-            doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
-            doc.text(shortTrackName, col5X, doc.y + 1, { width: col5W, align: "center" });
-            doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
-            doc.text("🔗 Buka Berkas", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
           } else {
             const hasCustomLink = Boolean(jrn.linkUrl);
             doc.fillColor("#1d4ed8").font("Times-Bold").fontSize(7.5);
@@ -348,36 +384,32 @@ export function generateMonthlyReportPdf({
 
       doc.fillColor("#334155").font("Times-Roman").fontSize(8);
       doc.text(`* Dokumen asli dan seluruh berkas pendukung tersimpan secara digital pada Google Drive:`, tableLeft, doc.y);
-      doc.moveDown(0.2);
-      if (effectiveGdrive) {
-        doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(8);
-        doc.text(effectiveGdrive, tableLeft, doc.y, {
-          link: effectiveGdrive,
-          underline: true
-        });
-      } else {
-        doc.fillColor("#64748b").font("Times-Italic").fontSize(8);
-        doc.text("(Belum diisi - Contoh: https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz)", tableLeft, doc.y);
-      }
+      doc.moveDown(0.3);
+
+      doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(8.5);
+      doc.text(effectiveGdrive, tableLeft, doc.y, {
+        link: effectiveGdrive,
+        underline: true
+      });
+
+      doc.moveDown(1.5);
 
       // -------------------------------------------------------------
-      // 5. KOLOM TANDA TANGAN RESMI
+      // 5. TANDA TANGAN (PEJABAT PENILAI & PEGAWAI)
       // -------------------------------------------------------------
-      doc.moveDown(2);
       const signY = doc.y;
-      const signColW = 220;
+      const signColW = tableWidth / 2;
 
       // Kiri: Pejabat Penilai Kinerja
       doc.fillColor("#000000").font("Times-Roman").fontSize(9);
       doc.text("Pejabat Penilai Kinerja,", tableLeft, signY);
-      doc.font("Times-Bold").text(penilai?.jabatan || "Kepala Sekolah", tableLeft, doc.y);
       doc.moveDown(3);
       doc.font("Times-Bold").fontSize(9).text(penilai?.nama || "ANDA SUPANDA, S.Pd, M.Pd", tableLeft, doc.y, { underline: true });
       doc.font("Times-Roman").fontSize(8.5).text(`NIP. ${penilai?.nip || "197505201998021001"}`, tableLeft, doc.y);
       doc.text(`Pangkat: ${penilai?.pangkat || "Pembina Tingkat I / IV/b"}`, tableLeft, doc.y);
 
       // Kanan: Pegawai yang Dinilai
-      const rightX = tableLeft + tableWidth - signColW;
+      const rightX = tableLeft + signColW;
       const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
       doc.font("Times-Roman").fontSize(9).text(`Samarinda, ${lastDay} ${monthName} ${year}`, rightX, signY);
       doc.text("Pegawai yang Dinilai,", rightX, doc.y);
@@ -426,26 +458,52 @@ export async function generateMonthlyReportZip({
   const daftarLampiranEntries = [];
 
   for (const jrn of filtered) {
-    const att = resolveJournalAttachment(jrn, uploadsDir);
-    if (!att.hasPhysicalFile) continue;
+    const atts = resolveAllJournalAttachments(jrn, uploadsDir);
+    if (atts.length === 0) continue;
 
     lampiranIndex++;
     const cleanDate = (jrn.tanggal || "tgl").replace(/[^0-9-]/g, "");
-    const safeTitle = (jrn.aktivitas || "lampiran").slice(0, 30).toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-    const ext = att.ext?.startsWith(".") ? att.ext : `.${att.ext || "pdf"}`;
-    const trackableFileName = `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+    const safeTitle = (jrn.aktivitas || "lampiran")
+      .slice(0, 30)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
 
-    let fileBuffer = null;
-    if (att.filePath && fs.existsSync(att.filePath)) {
-      try { fileBuffer = fs.readFileSync(att.filePath); } catch (e) {}
-    } else if (att.base64Data) {
-      try { fileBuffer = Buffer.from(att.base64Data, "base64"); } catch (e) {}
-    }
+    atts.forEach((att, subIdx) => {
+      const isMulti = atts.length > 1;
+      const subNum = subIdx + 1;
+      const ext = att.ext?.startsWith(".") ? att.ext : `.${att.ext || "pdf"}`;
+      const safeAttName = (att.fileName ? path.basename(att.fileName, path.extname(att.fileName)) : `berkas_${subNum}`)
+        .slice(0, 20)
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "_");
 
-    if (fileBuffer) {
-      zip.file(`lampiran/${trackableFileName}`, fileBuffer);
-      daftarLampiranEntries.push({ no: lampiranIndex, fileName: trackableFileName, tanggal: jrn.tanggal || "-", aktivitas: jrn.aktivitas || "-", output: jrn.outputJumlah || "-" });
-    }
+      const trackableFileName = isMulti
+        ? `lampiran-${lampiranIndex}.${subNum}_${cleanDate}_${safeTitle}_${safeAttName}${ext}`
+        : `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+
+      const labelNumber = isMulti ? `${lampiranIndex}.${subNum}` : `${lampiranIndex}`;
+
+      let fileBuffer = null;
+      if (att.filePath && fs.existsSync(att.filePath)) {
+        try { fileBuffer = fs.readFileSync(att.filePath); } catch (e) {}
+      } else if (att.base64Data) {
+        try { fileBuffer = Buffer.from(att.base64Data, "base64"); } catch (e) {}
+      }
+
+      if (fileBuffer) {
+        zip.file(`lampiran/${trackableFileName}`, fileBuffer);
+        daftarLampiranEntries.push({
+          no: labelNumber,
+          fileName: trackableFileName,
+          tanggal: jrn.tanggal || "-",
+          aktivitas: jrn.aktivitas || "-",
+          output: jrn.outputJumlah || "-",
+          type: att.type === "photo" ? "Foto Dokumentasi" : "Dokumen Berkas"
+        });
+      }
+    });
   }
 
   let daftarText = `========================================================================\nDAFTAR LAMPIRAN BUKTI EVIDEN KINERJA PEGAWAI\nPeriode    : Bulan ${monthName} ${year}\nPegawai    : ${pegawai?.nama || "-"} (NIP: ${pegawai?.nip || "-"})\nJabatan    : ${pegawai?.jabatan || "-"}\nUnit Kerja : ${pegawai?.unitKerja || "-"}\n========================================================================\n\n`;
@@ -454,11 +512,11 @@ export async function generateMonthlyReportZip({
   } else {
     daftarText += `Daftar Berkas Lampiran Terunggah (${daftarLampiranEntries.length} berkas):\n------------------------------------------------------------------------\n`;
     daftarLampiranEntries.forEach(item => {
-      daftarText += `[${item.no}] Lampiran ${item.no}: ${item.fileName}\n    - Tanggal  : ${item.tanggal}\n    - Aktivitas: ${item.aktivitas}\n    - Output   : ${item.output}\n\n`;
+      daftarText += `[${item.no}] Lampiran ${item.no}: ${item.fileName} (${item.type})\n    - Tanggal  : ${item.tanggal}\n    - Aktivitas: ${item.aktivitas}\n    - Output   : ${item.output}\n\n`;
     });
   }
-  daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Berkas PDF laporan resmi dan seluruh berkas lampiran eviden di atas telah\n   diberi penomoran runtut (lampiran-1, lampiran-2, dst.) agar mudah ditelusuri.\n2. Anda dapat langsung mengunggah arsip .ZIP ini atau mengekstrak folder\n   lampiran ke dalam folder Google Drive bukti dukung Anda.\n`;
-  if (gdriveLink) daftarText += `3. Tautan Folder Google Drive Terdaftar: ${gdriveLink}\n`;
+  daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Berkas PDF laporan resmi dan seluruh berkas lampiran eviden di atas telah\n   diberi penomoran runtut (lampiran-1, lampiran-2, dst.) agar mudah ditelusuri.\n2. Jika satu kegiatan memuat beberapa berkas, nomor lampiran bertingkat (misal: lampiran-1.1, lampiran-1.2).\n3. Anda dapat langsung mengunggah arsip .ZIP ini atau mengekstrak folder\n   lampiran ke dalam folder Google Drive bukti dukung Anda.\n`;
+  if (gdriveLink) daftarText += `4. Tautan Folder Google Drive Terdaftar: ${gdriveLink}\n`;
   daftarText += `========================================================================\n`;
 
   zip.file("DAFTAR_LAMPIRAN.txt", daftarText);

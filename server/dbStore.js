@@ -572,8 +572,48 @@ export function cleanupExpiredSessions(targetStore = null) {
 }
 
 /**
- * Manajemen Jurnal
+ * Manajemen Jurnal & Multi-Eviden (Multi-Attachment)
  */
+export function normalizeJournalAttachments(jrn) {
+  if (!jrn) return [];
+  if (Array.isArray(jrn.attachments) && jrn.attachments.length > 0) {
+    return jrn.attachments.map((att, idx) => ({
+      id: att.id || `att-${idx + 1}-${Date.now()}`,
+      type: att.type || (att.fotoPath || att.evidenceType === "image" ? "image" : "document"),
+      filePath: att.filePath || att.fotoPath || "",
+      fileName: att.fileName || (att.filePath ? path.basename(att.filePath) : `lampiran_${idx + 1}`),
+      fileUrl: att.fileUrl || att.fotoUrl || "",
+      fileSize: att.fileSize || "",
+      ext: att.ext || (att.fileName ? path.extname(att.fileName).toLowerCase() : "")
+    }));
+  }
+
+  // Fallback dari atribut legacy
+  const legacyCandidates = [];
+  if (jrn.fotoPath || jrn.fotoUrl || jrn.evidenceType === "image") {
+    legacyCandidates.push({
+      id: `att-legacy-photo-${jrn.id || Date.now()}`,
+      type: "image",
+      filePath: jrn.fotoPath || "",
+      fileName: jrn.fileName || (jrn.fotoPath ? path.basename(jrn.fotoPath) : "foto_kegiatan.jpg"),
+      fileUrl: jrn.fileUrl || jrn.fotoUrl || "",
+      fileSize: jrn.fileSize || "",
+      ext: jrn.fotoPath ? path.extname(jrn.fotoPath).toLowerCase() : ".jpg"
+    });
+  } else if (jrn.filePath || jrn.fileName || (jrn.fileUrl && jrn.evidenceType === "document")) {
+    legacyCandidates.push({
+      id: `att-legacy-doc-${jrn.id || Date.now()}`,
+      type: "document",
+      filePath: jrn.filePath || "",
+      fileName: jrn.fileName || (jrn.filePath ? path.basename(jrn.filePath) : "dokumen.pdf"),
+      fileUrl: jrn.fileUrl || "",
+      fileSize: jrn.fileSize || "",
+      ext: jrn.fileName ? path.extname(jrn.fileName).toLowerCase() : ".pdf"
+    });
+  }
+  return legacyCandidates;
+}
+
 export function getJournals(userId = null) {
   const store = getStore();
   const all = store.journals || [];
@@ -583,14 +623,89 @@ export function getJournals(userId = null) {
 
 export function addJournal(journalData) {
   const store = getStore();
+  
+  // Normalisasi attachments jika disediakan
+  let attachments = [];
+  if (Array.isArray(journalData.attachments) && journalData.attachments.length > 0) {
+    attachments = journalData.attachments.map((att, idx) => ({
+      id: att.id || `att-${Date.now()}-${idx + 1}`,
+      type: att.type || (att.evidenceType === "image" ? "image" : "document"),
+      filePath: att.filePath || att.fotoPath || "",
+      fileName: att.fileName || (att.filePath ? path.basename(att.filePath) : `berkas_${idx + 1}`),
+      fileUrl: att.fileUrl || att.fotoUrl || "",
+      fileSize: att.fileSize || "",
+      ext: att.ext || (att.fileName ? path.extname(att.fileName).toLowerCase() : "")
+    }));
+  } else {
+    // Bangun dari data single file legacy
+    attachments = normalizeJournalAttachments(journalData);
+  }
+
+  // Isi fallback field legacy dari lampiran pertama untuk kompatibilitas penuh
+  const firstAtt = attachments[0] || null;
+  const legacyFotoPath = journalData.fotoPath || (firstAtt && firstAtt.type === "image" ? firstAtt.filePath : "");
+  const legacyFilePath = journalData.filePath || (firstAtt && firstAtt.type !== "image" ? firstAtt.filePath : "");
+  const legacyFileName = journalData.fileName || (firstAtt ? firstAtt.fileName : "");
+  const legacyFileUrl = journalData.fileUrl || (firstAtt ? firstAtt.fileUrl : "");
+  const legacyEvidenceType = journalData.evidenceType || (firstAtt ? firstAtt.type : (attachments.length > 0 ? "document" : "none"));
+
   const newEntry = {
     id: journalData.id || `jrn-${Date.now()}`,
     createdAt: new Date().toISOString(),
-    ...journalData
+    ...journalData,
+    attachments,
+    fotoPath: legacyFotoPath,
+    filePath: legacyFilePath,
+    fileName: legacyFileName,
+    fileUrl: legacyFileUrl,
+    evidenceType: legacyEvidenceType
   };
+
   store.journals = [newEntry, ...(store.journals || [])];
   saveStore(store);
   return newEntry;
+}
+
+/**
+ * Menambahkan lampiran susulan ke jurnal yang sudah tersimpan
+ */
+export function addAttachmentToJournal(journalId, attachment) {
+  const store = getStore();
+  const jrn = (store.journals || []).find(j => j.id === journalId);
+  if (!jrn) return null;
+
+  jrn.attachments = normalizeJournalAttachments(jrn);
+  const newAtt = {
+    id: attachment.id || `att-${Date.now()}-${jrn.attachments.length + 1}`,
+    type: attachment.type || (attachment.evidenceType === "image" ? "image" : "document"),
+    filePath: attachment.filePath || attachment.fotoPath || "",
+    fileName: attachment.fileName || (attachment.filePath ? path.basename(attachment.filePath) : `berkas_${jrn.attachments.length + 1}`),
+    fileUrl: attachment.fileUrl || attachment.fotoUrl || "",
+    fileSize: attachment.fileSize || "",
+    ext: attachment.ext || (attachment.fileName ? path.extname(attachment.fileName).toLowerCase() : "")
+  };
+
+  jrn.attachments.push(newAtt);
+
+  // Jika field legacy belum terisi, isi dari attachment pertama ini
+  if (!jrn.fotoPath && newAtt.type === "image") {
+    jrn.fotoPath = newAtt.filePath;
+  }
+  if (!jrn.filePath && newAtt.type !== "image") {
+    jrn.filePath = newAtt.filePath;
+  }
+  if (!jrn.fileName) {
+    jrn.fileName = newAtt.fileName;
+  }
+  if (!jrn.fileUrl) {
+    jrn.fileUrl = newAtt.fileUrl;
+  }
+  if (!jrn.linkUrl && newAtt.fileUrl) {
+    jrn.linkUrl = newAtt.fileUrl;
+  }
+
+  saveStore(store);
+  return jrn;
 }
 
 /**
@@ -614,6 +729,17 @@ export function removeJournalAttachmentFiles(journalsList) {
     if (jrn.fileUrl && typeof jrn.fileUrl === "string" && jrn.fileUrl.includes("/uploads/")) {
       const bName = path.basename(jrn.fileUrl);
       candidates.push(path.resolve(UPLOADS_DIR, bName));
+    }
+
+    // Periksa juga seluruh attachments
+    if (Array.isArray(jrn.attachments)) {
+      for (const att of jrn.attachments) {
+        if (att.filePath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.filePath)));
+        if (att.fileName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.fileName)));
+        if (att.fileUrl && typeof att.fileUrl === "string" && att.fileUrl.includes("/uploads/")) {
+          candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.fileUrl)));
+        }
+      }
     }
 
     for (const fPath of candidates) {

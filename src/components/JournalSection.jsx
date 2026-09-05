@@ -39,6 +39,7 @@ export default function JournalSection({
     outputJumlah: "1 Dokumen / Kegiatan",
     rhkId: rhkList[0]?.id || "",
     catatan: "",
+    attachments: [],
     evidenceType: "none", // "image" | "document" | "none"
     docCategory: "pdf",
     fileName: "",
@@ -52,59 +53,67 @@ export default function JournalSection({
   const [notification, setNotification] = useState("");
   const fileInputRef = useRef(null);
 
-  // Handle File Upload (Foto, PDF, Word, Excel, dll.)
+  // Handle File Upload (Foto, PDF, Word, Excel, dll. - Mendukung Multi-File)
   const handleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     try {
       setIsUploading(true);
-      const processed = await processEvidenceFile(file);
+      const newAttachments = [];
 
-      // Upload ke backend /api/upload agar memiliki URL link langsung di aplikasi
-      let serverFileUrl = "";
-      try {
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fileName: processed.name,
-            fileData: processed.dataUrl
-          })
-        });
-        if (uploadRes.ok) {
-          const upJson = await uploadRes.json();
-          if (upJson?.fileUrl) {
-            serverFileUrl = upJson.fileUrl;
+      for (const file of files) {
+        const processed = await processEvidenceFile(file);
+
+        // Upload ke backend /api/upload agar memiliki URL link langsung di aplikasi
+        let serverFileUrl = "";
+        try {
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: processed.name,
+              fileData: processed.dataUrl
+            })
+          });
+          if (uploadRes.ok) {
+            const upJson = await uploadRes.json();
+            if (upJson?.fileUrl) {
+              serverFileUrl = upJson.fileUrl;
+            }
           }
+        } catch (netErr) {
+          // Mode offline/standalone, gunakan dataUrl lokal
         }
-      } catch (netErr) {
-        // Mode offline/standalone, gunakan dataUrl lokal
-      }
 
-      if (processed.category === "image") {
-        setFormData(prev => ({
-          ...prev,
-          evidenceType: "image",
-          docCategory: "image",
+        const isImg = processed.category === "image";
+        newAttachments.push({
+          id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          type: isImg ? "image" : "document",
+          docCategory: isImg ? "image" : processed.type,
           fileName: processed.name,
           fileSize: processed.size,
           fotoUrl: processed.dataUrl,
           fileUrl: serverFileUrl,
-          linkUrl: prev.linkUrl || serverFileUrl
-        }));
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          evidenceType: "document",
-          docCategory: processed.type,
-          fileName: processed.name,
-          fileSize: processed.size,
-          fotoUrl: processed.dataUrl, // base64 document
-          fileUrl: serverFileUrl,
-          linkUrl: prev.linkUrl || serverFileUrl
-        }));
+          linkUrl: serverFileUrl
+        });
       }
+
+      setFormData(prev => {
+        const combined = [...(prev.attachments || []), ...newAttachments];
+        const first = combined[0];
+        return {
+          ...prev,
+          attachments: combined,
+          evidenceType: first ? first.type : "none",
+          docCategory: first ? first.docCategory : "pdf",
+          fileName: first ? first.fileName : "",
+          fileSize: first ? first.fileSize : "",
+          fotoUrl: first ? first.fotoUrl : "",
+          fileUrl: first ? first.fileUrl : "",
+          linkUrl: prev.linkUrl || (first ? first.fileUrl : "")
+        };
+      });
     } catch (err) {
       alert("Gagal memproses file: " + err.message);
     } finally {
@@ -113,9 +122,27 @@ export default function JournalSection({
     }
   };
 
+  const handleRemoveAttachment = (attId) => {
+    setFormData(prev => {
+      const remaining = (prev.attachments || []).filter(a => a.id !== attId);
+      const first = remaining[0];
+      return {
+        ...prev,
+        attachments: remaining,
+        evidenceType: first ? first.type : "none",
+        docCategory: first ? first.docCategory : "pdf",
+        fileName: first ? first.fileName : "",
+        fileSize: first ? first.fileSize : "",
+        fotoUrl: first ? first.fotoUrl : "",
+        fileUrl: first ? first.fileUrl : ""
+      };
+    });
+  };
+
   const handleRemoveFile = () => {
     setFormData(prev => ({
       ...prev,
+      attachments: [],
       evidenceType: "none",
       docCategory: "pdf",
       fileName: "",
@@ -600,11 +627,12 @@ export default function JournalSection({
                 type="file" 
                 ref={fileInputRef}
                 onChange={handleFileSelect}
+                multiple
                 accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                 style={{ display: "none" }}
               />
 
-              {!formData.fileName ? (
+              {(!formData.attachments || formData.attachments.length === 0) ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
                   style={{
@@ -623,56 +651,69 @@ export default function JournalSection({
                     <FileSpreadsheet size={22} />
                   </div>
                   <p style={{ fontSize: "0.85rem", fontWeight: "600", color: "var(--text-primary)" }}>
-                    {isUploading ? "Memproses Berkas..." : "Klik untuk Unggah Foto atau Dokumen"}
+                    {isUploading ? "Memproses Berkas..." : "Klik untuk Unggah Berkas (Bisa Pilih Banyak)"}
                   </p>
                   <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "2px" }}>
                     Foto (.jpg, .png) atau Berkas (.pdf, .docx, .xlsx, dll.)
                   </p>
                 </div>
               ) : (
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.75rem 1rem",
-                  background: "var(--bg-secondary)",
-                  borderRadius: "var(--radius-md)",
-                  border: "1px solid var(--border-subtle)"
-                }}>
-                  {formData.fotoUrl && formData.evidenceType === "image" ? (
-                    <img 
-                      src={formData.fotoUrl} 
-                      alt="Bukti Kerja" 
-                      style={{ width: "55px", height: "45px", objectFit: "cover", borderRadius: "6px", border: "1px solid var(--border-strong)" }}
-                    />
-                  ) : (
-                    <div style={{ 
-                      width: "45px", 
-                      height: "45px", 
-                      borderRadius: "6px", 
-                      background: "var(--bg-tertiary)", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "center" 
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {formData.attachments.map((att, attIdx) => (
+                    <div key={att.id || attIdx} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      padding: "0.5rem 0.75rem",
+                      background: "var(--bg-secondary)",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px solid var(--border-subtle)"
                     }}>
-                      {renderFileIcon(formData.evidenceType, formData.docCategory)}
+                      {att.fotoUrl && att.type === "image" ? (
+                        <img 
+                          src={att.fotoUrl} 
+                          alt="Bukti Kerja" 
+                          style={{ width: "45px", height: "38px", objectFit: "cover", borderRadius: "6px", border: "1px solid var(--border-strong)" }}
+                        />
+                      ) : (
+                        <div style={{ 
+                          width: "40px", 
+                          height: "38px", 
+                          borderRadius: "6px", 
+                          background: "var(--bg-tertiary)", 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "center" 
+                        }}>
+                          {renderFileIcon(att.type, att.docCategory)}
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: "0.82rem", fontWeight: "700", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", margin: 0 }}>
+                          {att.fileName}
+                        </p>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                          {att.fileSize} • {att.type === "image" ? "Foto Dokumentasi" : "Dokumen Berkas"}
+                        </span>
+                      </div>
+                      <button 
+                        type="button" 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => handleRemoveAttachment(att.id)}
+                        style={{ color: "var(--accent-rose)", padding: "0.2rem 0.4rem" }}
+                        title="Hapus berkas ini"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: "0.82rem", fontWeight: "700", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                      {formData.fileName}
-                    </p>
-                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                      {formData.fileSize} • {formData.evidenceType === "image" ? "Foto Dokumentasi" : "Dokumen Berkas"}
-                    </span>
-                  </div>
+                  ))}
                   <button 
                     type="button" 
                     className="btn btn-outline btn-sm"
-                    onClick={handleRemoveFile}
-                    style={{ color: "var(--accent-rose)", padding: "0.25rem 0.5rem" }}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ alignSelf: "flex-start", marginTop: "0.25rem", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px" }}
                   >
-                    <Trash2 size={13} />
+                    <Paperclip size={12} /> + Tambah Berkas Lainnya
                   </button>
                 </div>
               )}
@@ -736,9 +777,14 @@ export default function JournalSection({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
           {journals.map((j, index) => {
-            const isPhoto = Boolean(j.fotoUrl);
-            const hasDocument = Boolean(j.fileName && (!isPhoto || j.evidenceType === "document"));
+            const attList = Array.isArray(j.attachments) && j.attachments.length > 0
+              ? j.attachments
+              : (j.fotoUrl || j.fileName ? [{ type: j.evidenceType || (j.fotoUrl ? "image" : "document"), fotoUrl: j.fotoUrl, fileName: j.fileName, fileSize: j.fileSize, docCategory: j.docCategory }] : []);
+            const photoAtt = attList.find(a => a.type === "image" && a.fotoUrl);
+            const isPhoto = Boolean(photoAtt);
+            const hasDocument = attList.some(a => a.type !== "image");
             const hasLink = Boolean(j.linkUrl);
+            const totalAtts = attList.length;
 
             return (
               <div 
@@ -770,7 +816,7 @@ export default function JournalSection({
                 <div style={{ flexShrink: 0 }}>
                   {isPhoto ? (
                     <div 
-                      onClick={() => setActivePhotoModal(j)}
+                      onClick={() => setActivePhotoModal({ ...j, fotoUrl: photoAtt.fotoUrl })}
                       title="Klik untuk memperbesar foto"
                       style={{ 
                         width: "60px", 
@@ -784,7 +830,7 @@ export default function JournalSection({
                       }}
                     >
                       <img 
-                        src={j.fotoUrl} 
+                        src={photoAtt.fotoUrl} 
                         alt={j.aktivitas} 
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
@@ -813,7 +859,7 @@ export default function JournalSection({
                       justifyContent: "center",
                       border: "1px solid var(--border-subtle)"
                     }}>
-                      {renderFileIcon(j.evidenceType, j.docCategory)}
+                      {renderFileIcon(attList[0]?.type || j.evidenceType, attList[0]?.docCategory || j.docCategory)}
                     </div>
                   )}
                 </div>
@@ -851,16 +897,23 @@ export default function JournalSection({
                       </span>
                     )}
 
-                    {isPhoto && (
-                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                        <Camera size={11} /> Foto Terlampir
+                    {totalAtts > 1 ? (
+                      <span className="badge" style={{ fontSize: "0.7rem", padding: "0.15rem 0.45rem", background: "var(--bg-tertiary)", color: "var(--text-primary)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                        <Paperclip size={11} /> {totalAtts} Berkas Lampiran
                       </span>
-                    )}
-
-                    {hasDocument && (
-                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                        <FileText size={11} /> {j.fileName || "Dokumen"}
-                      </span>
+                    ) : (
+                      <>
+                        {isPhoto && (
+                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <Camera size={11} /> Foto Terlampir
+                          </span>
+                        )}
+                        {hasDocument && (
+                          <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                            <FileText size={11} /> {attList[0]?.fileName || j.fileName || "Dokumen"}
+                          </span>
+                        )}
+                      </>
                     )}
 
                     {hasLink && (
