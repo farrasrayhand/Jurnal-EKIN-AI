@@ -65,19 +65,23 @@ export function getPool() {
 
 /**
  * Inisialisasi Tabel & Seeder Otomatis pada Database MySQL
+ * Dilengkapi fitur auto-retry jika database server di Docker/Easypanel masih dalam proses booting
  */
-export async function initMysqlDatabase() {
+export async function initMysqlDatabase(maxRetries = 3, retryDelayMs = 3000) {
   const config = getMysqlConfig();
   if (!config) {
     return { enabled: false, reason: "MySQL tidak dikonfigurasi (menggunakan penyimpanan JSON lokal)." };
   }
 
-  try {
-    const pool = getPool();
-    const conn = await pool.getConnection();
-
+  let attempt = 0;
+  while (attempt <= maxRetries) {
+    attempt++;
     try {
-      console.log(`[MySQL] Terhubung ke database '${config.database}' di host '${config.host}:${config.port}'.`);
+      const pool = getPool();
+      const conn = await pool.getConnection();
+
+      try {
+        console.log(`[MySQL] Terhubung ke database '${config.database}' di host '${config.host}:${config.port}'.`);
 
       // 1. Tabel Accounts (Pengguna & Superadmin)
       await conn.query(`
@@ -268,10 +272,24 @@ export async function initMysqlDatabase() {
     } finally {
       conn.release();
     }
-  } catch (err) {
-    console.error(`❌ [MySQL] Gagal menghubungkan atau menginisialisasi MySQL (${config.host}:${config.port}):`, err.message);
-    console.warn("⚠️ Sistem otomatis fallback ke penyimpanan file JSON lokal database/ekinerja_store.json.");
-    return { enabled: false, error: err.message };
+    } catch (err) {
+      const isRefused = err.code === "ECONNREFUSED" || (err.message && err.message.includes("ECONNREFUSED"));
+      const isTimeout = err.code === "ETIMEDOUT" || (err.message && err.message.includes("ETIMEDOUT"));
+
+      if ((isRefused || isTimeout) && attempt <= maxRetries) {
+        console.warn(`⏳ [MySQL] Host ${config.host}:${config.port} belum siap (${err.code || "koneksi ditolak"}). Mencoba kembali (${attempt}/${maxRetries}) dalam ${retryDelayMs / 1000} detik...`);
+        if (poolInstance) {
+          try { await poolInstance.end(); } catch (e) {}
+          poolInstance = null;
+        }
+        await new Promise(r => setTimeout(r, retryDelayMs));
+        continue;
+      }
+
+      console.error(`❌ [MySQL] Gagal menghubungkan atau menginisialisasi MySQL (${config.host}:${config.port}):`, err.message);
+      console.warn("⚠️ Sistem otomatis fallback ke penyimpanan file JSON lokal database/ekinerja_store.json.");
+      return { enabled: false, error: err.message };
+    }
   }
 }
 

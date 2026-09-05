@@ -1105,6 +1105,29 @@ async function startServer() {
           }
         } else {
           dbStatus = `${activeType.toUpperCase()} Fallback (${dbInit.error || dbInit.reason || "offline"}), aktif di JSON lokal`;
+          
+          // Background Auto-Reconnect: Coba sambungkan otomatis jika service database di Easypanel selesai booting
+          let bgAttempt = 0;
+          const bgReconnectTimer = setInterval(async () => {
+            bgAttempt++;
+            try {
+              const retryInit = await initDatabase();
+              if (retryInit && retryInit.enabled) {
+                clearInterval(bgReconnectTimer);
+                console.log(`\n🎉 [Database Reconnected] Database ${activeType.toUpperCase()} kini berhasil terhubung di background! (${retryInit.accountCount || 0} akun).`);
+                const remoteStore = await loadStoreFromDatabase();
+                if (remoteStore) {
+                  setCachedStore(remoteStore);
+                  try {
+                    fs.writeFileSync(DB_FILE, JSON.stringify(remoteStore, null, 2), "utf8");
+                  } catch (e) {}
+                }
+              }
+            } catch (e) {}
+            if (bgAttempt >= 30) {
+              clearInterval(bgReconnectTimer);
+            }
+          }, 10000);
         }
       } catch (e) {
         dbStatus = `${activeType.toUpperCase()} Gagal (${e.message}), aktif di JSON lokal`;
