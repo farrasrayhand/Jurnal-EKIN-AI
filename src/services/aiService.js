@@ -487,7 +487,8 @@ export async function polishJournalWithAi({
           outputJumlah: data.outputJumlah || "1 Dokumen / Kegiatan",
           rhkId: matchedRhkId || (rhkList[0]?.id || ""),
           catatan: data.catatan || "Terselesaikan dalam kondisi optimal.",
-          source: data.source || "gemini-ai"
+          source: data.source || "gemini-ai",
+          isOnline: Boolean(data.source && data.source.includes("gemini"))
         };
       }
     }
