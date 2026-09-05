@@ -1433,11 +1433,16 @@ export async function handleIncomingText(botInstance, msg) {
         // Otomatis aktifkan sesi login di Telegram
         setTelegramSession(chatId, result.user.id);
 
+        const aiStatusText = result.user.allowEnvKey !== false
+          ? `✅ Aktif (Server .env)`
+          : `🔒 Dibatasi (Wajib masukkan API Key Gemini pribadi di Web)`;
+
         const welcome = `🎉 *PENDAFTARAN AKUN BERHASIL!* 🇮🇩\n\n` +
           `Selamat datang di sistem E-Kinerja AI, *${result.user.nama}*!\n` +
           `• *Username*: \`${result.user.username}\`\n` +
           `• *NIP*: \`${result.user.nip || "-"}\`\n` +
-          `• *Role*: ${result.user.role || "pegawai"}\n\n` +
+          `• *Role*: ${result.user.role || "pegawai"}\n` +
+          `• *Akses AI*: ${aiStatusText}\n\n` +
           `Sesi akun Anda telah *otomatis aktif* di Telegram ini! 🚀\n\n` +
           `⚠️ *Langkah Lanjutan:*\n` +
           `Lengkapi Pangkat, Jabatan, dan Unit Kerja Anda agar dapat membuat laporan resmi BKN:\n` +

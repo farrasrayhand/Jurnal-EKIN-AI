@@ -117,7 +117,8 @@ export default function AccountManagerModal({
     maxUsesOption: "1", // "1" | "5" | "10" | "25" | "50" | "custom" | "unlimited"
     customMaxUses: "10",
     expiryOption: "7d", // "1h" | "24h" | "3d" | "7d" | "30d" | "never"
-    role: "pegawai"
+    role: "pegawai",
+    allowEnvKey: true
   });
   const [codeSubmitError, setCodeSubmitError] = useState("");
   const [codeSubmitSuccess, setCodeSubmitSuccess] = useState("");
@@ -190,6 +191,7 @@ export default function AccountManagerModal({
         maxUses,
         expiresAt,
         role: codeForm.role || "pegawai",
+        allowEnvKey: codeForm.allowEnvKey !== false,
         createdBy: currentUser?.username || "superadmin"
       });
 
@@ -200,7 +202,8 @@ export default function AccountManagerModal({
         maxUsesOption: "1",
         customMaxUses: "10",
         expiryOption: "7d",
-        role: "pegawai"
+        role: "pegawai",
+        allowEnvKey: true
       });
       reloadRegistrationCodes();
     } catch (err) {
@@ -1566,7 +1569,7 @@ export default function AccountManagerModal({
                     </div>
                   </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: "0.75rem", alignItems: "flex-end" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 1.2fr auto", gap: "0.75rem", alignItems: "flex-end" }}>
                     <div>
                       <label className="form-label" style={{ fontWeight: "600", fontSize: "0.8rem" }}>
                         Catatan / Keperluan Kode
@@ -1583,7 +1586,7 @@ export default function AccountManagerModal({
 
                     <div>
                       <label className="form-label" style={{ fontWeight: "600", fontSize: "0.8rem" }}>
-                        Role Akun Hasil Registrasi
+                        Role Akun Registrasi
                       </label>
                       <select
                         className="input-field"
@@ -1596,6 +1599,21 @@ export default function AccountManagerModal({
                       </select>
                     </div>
 
+                    <div>
+                      <label className="form-label" style={{ fontWeight: "600", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span>Izin API Server (.env)</span>
+                      </label>
+                      <select
+                        className="input-field"
+                        value={codeForm.allowEnvKey ? "yes" : "no"}
+                        onChange={(e) => setCodeForm({ ...codeForm, allowEnvKey: e.target.value === "yes" })}
+                        style={{ fontSize: "0.85rem" }}
+                      >
+                        <option value="yes">✅ Diizinkan (.env Server)</option>
+                        <option value="no">🔒 Dibatasi (Wajib Key Pribadi)</option>
+                      </select>
+                    </div>
+
                     <button
                       type="submit"
                       disabled={isSubmittingCode}
@@ -1605,6 +1623,15 @@ export default function AccountManagerModal({
                       <Plus size={15} />
                       <span>{isSubmittingCode ? "Menerbitkan..." : "Terbitkan Kode"}</span>
                     </button>
+                  </div>
+
+                  <div style={{ marginTop: "0.5rem", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                    <span>💡</span>
+                    <span>
+                      {codeForm.allowEnvKey
+                        ? "Pengguna yang mendaftar dengan kode ini otomatis diizinkan menggunakan API Gemini bawaan server (.env)."
+                        : "Pengguna yang mendaftar dengan kode ini dibatasi: wajib memasukkan Gemini API Key pribadi untuk fitur AI."}
+                    </span>
                   </div>
                 </form>
               </div>
@@ -1648,6 +1675,7 @@ export default function AccountManagerModal({
                           <tr style={{ background: "var(--bg-tertiary)", borderBottom: "1px solid var(--border-subtle)", textAlign: "left" }}>
                             <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Kode Registrasi</th>
                             <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Status</th>
+                            <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Akses API .env</th>
                             <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Kuota Terpakai</th>
                             <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Batas Waktu</th>
                             <th style={{ padding: "0.75rem 1rem", fontWeight: "700" }}>Catatan &amp; Pengguna</th>
@@ -1737,6 +1765,42 @@ export default function AccountManagerModal({
                                       fontWeight: "700"
                                     }}>
                                       ⚪ Nonaktif
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td style={{ padding: "0.75rem 1rem" }}>
+                                  {c.allowEnvKey !== false ? (
+                                    <span style={{
+                                      background: "#eff6ff",
+                                      color: "#1d4ed8",
+                                      border: "1px solid #bfdbfe",
+                                      padding: "0.2rem 0.5rem",
+                                      borderRadius: "999px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: "700",
+                                      whiteSpace: "nowrap",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "3px"
+                                    }}>
+                                      🔑 Diizinkan (.env)
+                                    </span>
+                                  ) : (
+                                    <span style={{
+                                      background: "#fef3c7",
+                                      color: "#92400e",
+                                      border: "1px solid #fde68a",
+                                      padding: "0.2rem 0.5rem",
+                                      borderRadius: "999px",
+                                      fontSize: "0.72rem",
+                                      fontWeight: "700",
+                                      whiteSpace: "nowrap",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "3px"
+                                    }}>
+                                      🔒 Wajib Key Pribadi
                                     </span>
                                   )}
                                 </td>

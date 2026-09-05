@@ -996,6 +996,7 @@ export function createRegistrationCode({
   maxUses = 1,
   expiresAt = null,
   role = "pegawai",
+  allowEnvKey = true,
   createdBy = "superadmin"
 }) {
   const store = getStore();
@@ -1027,6 +1028,7 @@ export function createRegistrationCode({
     usedBy: [],
     expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
     role: role || "pegawai",
+    allowEnvKey: allowEnvKey !== false,
     isActive: true,
     createdAt: new Date().toISOString(),
     createdBy: createdBy || "superadmin"
@@ -1140,6 +1142,7 @@ export function registerNewUser({
     jabatan: jabatan ? String(jabatan).trim() : "-",
     unitKerja: unitKerja ? String(unitKerja).trim() : "-",
     registeredWithCode: codeRecord.code,
+    allowEnvKey: codeRecord.allowEnvKey !== undefined ? Boolean(codeRecord.allowEnvKey) : true,
     createdAt: now,
     updatedAt: now
   };

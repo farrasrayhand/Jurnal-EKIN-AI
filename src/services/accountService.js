@@ -389,6 +389,7 @@ export async function generateRegistrationCode({
   maxUses = 1,
   expiresAt = null,
   role = "pegawai",
+  allowEnvKey = true,
   createdBy = "superadmin"
 }) {
   const res = await fetch("/api/admin/registration-codes", {
@@ -400,6 +401,7 @@ export async function generateRegistrationCode({
       maxUses,
       expiresAt,
       role,
+      allowEnvKey,
       createdBy
     })
   });
