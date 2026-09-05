@@ -140,6 +140,103 @@ const NAMA_BULAN_INDONESIA = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember"
 ];
 
+/**
+ * Ekstraksi Jam / Waktu Kerja dan Tanggal dari Teks Pesan Telegram
+ * Jika tidak ditemukan jam pada teks, otomatis menggunakan defaultJam (default: "08:00 - 16:00")
+ */
+export function extractTimeAndDate(text, defaultJam = "08:00 - 16:00") {
+  if (!text) {
+    return {
+      jam: defaultJam,
+      isCustomJam: false,
+      tanggal: null,
+      cleanText: ""
+    };
+  }
+
+  let cleanText = text;
+  let detectedJam = null;
+  let detectedDate = null;
+
+  // 1. Deteksi Pola Jam Rentang dengan Menit (misal: "08:00 - 16:00", "jam 08.00-11.30", "(jam 07.30 - 15.00)", "pukul 07.30 s/d 15.00 WIB", "[08:00 - 12:00]")
+  const rangeTimeWithMinutesRegex = /(?:\(?\s*(?:jam|pukul|waktu)?\s*[:=]?\s*\(?)\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai|\/)\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
+  const matchRangeMin = cleanText.match(rangeTimeWithMinutesRegex);
+  if (matchRangeMin) {
+    const h1 = parseInt(matchRangeMin[1], 10);
+    const m1 = parseInt(matchRangeMin[2], 10);
+    const h2 = parseInt(matchRangeMin[3], 10);
+    const m2 = parseInt(matchRangeMin[4], 10);
+
+    if (h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23) {
+      detectedJam = `${String(h1).padStart(2, "0")}:${String(m1).padStart(2, "0")} - ${String(h2).padStart(2, "0")}:${String(m2).padStart(2, "0")}`;
+      cleanText = cleanText.replace(matchRangeMin[0], " ").trim();
+    }
+  }
+
+  // 2. Deteksi Pola Jam Rentang Angka Bulat (misal: "jam 8 - 16", "pukul 8-12", "(jam 8 sampai 15)")
+  if (!detectedJam) {
+    const rangeHourRegex = /(?:\(?\s*(?:jam|pukul|waktu)\s*[:=]?\s*|\()\s*([0-2]?[0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai)\s*([0-2]?[0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
+    const matchRangeHour = cleanText.match(rangeHourRegex);
+    if (matchRangeHour) {
+      const h1 = parseInt(matchRangeHour[1], 10);
+      const h2 = parseInt(matchRangeHour[2], 10);
+      if (h1 >= 0 && h1 <= 23 && h2 >= 0 && h2 <= 23) {
+        detectedJam = `${String(h1).padStart(2, "0")}:00 - ${String(h2).padStart(2, "0")}:00`;
+        cleanText = cleanText.replace(matchRangeHour[0], " ").trim();
+      }
+    }
+  }
+
+  // 3. Deteksi Tanggal ISO (YYYY-MM-DD), misal: "tgl 2026-09-04" atau "2026-09-04"
+  const dateIsoRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)?(\b20\d{2}[-/][0-1]\d[-/][0-3]\d\b)\s*[\)\]]?/i;
+  const matchIso = cleanText.match(dateIsoRegex);
+  if (matchIso) {
+    detectedDate = matchIso[1].replace(/\//g, "-");
+    cleanText = cleanText.replace(matchIso[0], " ").trim();
+  }
+
+  // 4. Deteksi Tanggal Format Teks Indonesia (misal: "tgl 5 September 2026")
+  if (!detectedDate) {
+    const dateIndoTextRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)?(\b[0-3]?\d)\s+([a-zA-Z]+)\s+(20\d{2})\b\s*[\)\]]?/i;
+    const matchIndo = cleanText.match(dateIndoTextRegex);
+    if (matchIndo && NAMA_BULAN_MAP[matchIndo[2].toLowerCase()]) {
+      const d = String(parseInt(matchIndo[1], 10)).padStart(2, "0");
+      const m = NAMA_BULAN_MAP[matchIndo[2].toLowerCase()];
+      const y = matchIndo[3];
+      detectedDate = `${y}-${m}-${d}`;
+      cleanText = cleanText.replace(matchIndo[0], " ").trim();
+    }
+  }
+
+  // 5. Deteksi Tanggal Format Angka (misal: "tgl 04/09/2026", "tanggal 4-9-2026")
+  if (!detectedDate) {
+    const dateNumRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)(\b[0-3]?\d)[-/]([0-1]?\d)[-/](20\d{2})\b\s*[\)\]]?/i;
+    const matchNum = cleanText.match(dateNumRegex);
+    if (matchNum) {
+      const d = String(parseInt(matchNum[1], 10)).padStart(2, "0");
+      const m = String(parseInt(matchNum[2], 10)).padStart(2, "0");
+      const y = matchNum[3];
+      detectedDate = `${y}-${m}-${d}`;
+      cleanText = cleanText.replace(matchNum[0], " ").trim();
+    }
+  }
+
+  // Bersihkan karakter kurung/koma/spasi/titik dua sisa pemotongan waktu & tanggal
+  cleanText = cleanText
+    .replace(/\(\s*\)/g, "")
+    .replace(/\[\s*\]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[,\s;:\-\(\)\[\]]+|[,\s;:\-\(\)\[\]]+$/g, "")
+    .trim();
+
+  return {
+    jam: detectedJam || defaultJam,
+    isCustomJam: Boolean(detectedJam),
+    tanggal: detectedDate || null,
+    cleanText: cleanText || text
+  };
+}
+
 // Validasi Keberadaan Token
 if (!token || token.trim() === "" || token.includes("PASTE_HERE") || token.includes("TOKEN_ANDA")) {
   console.log(`
@@ -217,11 +314,14 @@ export function sendMainMenu(botInstance, chatId, user) {
     ],
     [
       { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
-      { text: "👤 Profil Saya", callback_data: "menu:profil" }
+      { text: "⏰ Jam Default Kerja", callback_data: "menu:jam" }
     ],
     [
       { text: "⚙️ Atur Data Diri", callback_data: "menu:setprofil" },
-      { text: "🚪 Keluar", callback_data: "menu:logout" }
+      { text: "👤 Profil Saya", callback_data: "menu:profil" }
+    ],
+    [
+      { text: "🚪 Keluar / Logout", callback_data: "menu:logout" }
     ]
   ];
 
@@ -595,15 +695,24 @@ export async function handleCallbackQuery(botInstance, query) {
       return sendMainMenu(botInstance, chatId, session.user);
     }
     if (action === "catat") {
+      const defaultJam = session.user?.defaultJam || "08:00 - 16:00";
       return botInstance.sendMessage(
         chatId,
         `📝 *CARA MENCATAT JURNAL AKTIVITAS*\n\n` +
         `Cukup ketik uraian pekerjaan Anda dengan bahasa santai di chat ini!\n\n` +
-        `_Contoh teks:_ \n"tadi pagi instal ulang windows lab komputer dan bantu cetak surat tugas dinas"\n\n` +
+        `_Contoh teks:_ \n• "tadi pagi instal ulang windows lab komputer dan bantu cetak surat tugas dinas"\n• "rapat dinas kurikulum jam 08:00 - 11:30"\n• "pukul 07.30 - 14.00 pendampingan praktikum siswa"\n\n` +
+        `⏰ *Pengaturan Jam Kerja*:\n` +
+        `• Jika Anda menuliskan jam pada pesan, jam tersebut yang akan disimpan.\n` +
+        `• Jika tidak menuliskan jam, otomatis menggunakan jam default: \`${defaultJam}\`.\n` +
+        `• Ketik \`/jam\` untuk melihat/mengubah jam default kantor Anda.\n\n` +
         `🤖 *AI otomatis mengubahnya* ke kalimat formal standar SKP BKN dan menyimpannya ke logbook Anda.\n\n` +
         `📸 Anda juga bisa langsung kirim *Foto* atau 📄 *Dokumen* dengan caption tugas!`,
         { parse_mode: "Markdown" }
       );
+    }
+    if (action === "jam") {
+      if (!session) return handleStart(botInstance, { chat: { id: chatId } });
+      return sendJamPicker(botInstance, chatId, session.user);
     }
     if (action === "jurnal") {
       return handleJournals(botInstance, { chat: { id: chatId } });
@@ -831,6 +940,54 @@ export async function handleCallbackQuery(botInstance, query) {
           reply_markup: {
             inline_keyboard: [
               [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+              [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+            ]
+          }
+        }
+      );
+    }
+  }
+
+  // F. Pengaturan Jam Kerja Default (jam:*)
+  if (data.startsWith("jam:")) {
+    if (!session) {
+      return botInstance.sendMessage(chatId, "⚠️ Sesi Anda telah berakhir. Silakan login kembali.");
+    }
+    const jamAction = data.replace("jam:", "");
+    let newJam = null;
+    if (jamAction === "set_0800_1600") newJam = "08:00 - 16:00";
+    else if (jamAction === "set_0730_1600") newJam = "07:30 - 16:00";
+    else if (jamAction === "set_0730_1400") newJam = "07:30 - 14:00";
+    else if (jamAction === "set_0800_1530") newJam = "08:00 - 15:30";
+    else if (jamAction === "manual") {
+      return botInstance.sendMessage(
+        chatId,
+        `✏️ *Atur Jam Kerja Default Manual*\n\n` +
+        `Ketik perintah \`/jam\` diikuti rentang jam kerja Anda, contoh:\n` +
+        `• \`/jam 07:30 - 16:00\`\n` +
+        `• \`/jam 08:00 - 14:30\`\n\n` +
+        `_(Ketik /batal untuk membatalkan)_`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    if (newJam) {
+      try {
+        updateUserProfile(session.userId, { defaultJam: newJam });
+        session.user.defaultJam = newJam;
+      } catch (e) {}
+
+      return botInstance.sendMessage(
+        chatId,
+        `✅ *Jam Kerja Default Berhasil Disimpan!*\n\n` +
+        `⏰ Jam kerja default Anda sekarang: \`${newJam}\`\n\n` +
+        `Setiap kali Anda mengirim jurnal tanpa menyebutkan jam, sistem otomatis menetapkan jam \`${newJam}\`.\n\n` +
+        `_💡 Tips: Anda tetap bisa menentukan jam berbeda per kegiatan cukup dengan mengetiknya di pesan (contoh: "rapat dinas jam 08:00 - 11:30")._`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📝 Mulai Catat Aktivitas", callback_data: "menu:catat" }],
               [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
             ]
           }
@@ -1790,7 +1947,11 @@ export async function handleIncomingText(botInstance, msg) {
     }
 
     // D. Deteksi apakah pesan teks mengandung URL / Tautan Google Drive
-    const { url: detectedUrl, cleanText } = extractUrl(text);
+    const { url: detectedUrl, cleanText: textAfterUrl } = extractUrl(text);
+
+    // E. Deteksi Jam/Waktu dan Tanggal Kerja dari Pesan
+    const defaultUserJam = user.defaultJam || "08:00 - 16:00";
+    const { jam: finalJam, isCustomJam, tanggal: customDate, cleanText } = extractTimeAndDate(textAfterUrl, defaultUserJam);
 
     const polished = await polishJournalNode({
       rawText: cleanText,
@@ -1800,14 +1961,14 @@ export async function handleIncomingText(botInstance, msg) {
     });
 
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
+    const dateStr = customDate || now.toISOString().slice(0, 10);
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
 
     const firstAtt = attachedEvidences[0] || null;
     const journalPayload = {
       userId: user.id,
       tanggal: dateStr,
-      jam: "08:00 - 16:00",
+      jam: finalJam,
       aktivitas: polished.aktivitas,
       aktivitasKasaran: cleanText,
       outputJumlah: polished.outputJumlah,
@@ -1836,7 +1997,8 @@ export async function handleIncomingText(botInstance, msg) {
     const newEntry = addJournal(journalPayload);
 
     let reply = `✨ *Jurnal Berhasil Dipoles AI & Disimpan ke Logbook!* ✨\n\n` +
-      `📅 *Tanggal*: \`${dateStr}\` (${timeStr})\n` +
+      `📅 *Tanggal*: \`${dateStr}\`\n` +
+      `⏰ *Waktu/Jam*: \`${finalJam}\`${isCustomJam ? " *(Sesuai input)*" : " *(Default)*"}\n` +
       `👤 *Pegawai*: *${user.nama}*\n\n` +
       `📝 *Uraian Tugas Formal (Hasil AI)*:\n` +
       `_${polished.aktivitas}_\n\n` +
@@ -2007,6 +2169,82 @@ export function handleLinkCommand(botInstance, msg, match) {
   });
 }
 
+/**
+ * Handler Perintah /jam [rentang_jam]
+ */
+export function handleJamCommand(botInstance, msg, match) {
+  const chatId = msg.chat.id;
+  const session = getTelegramSession(chatId);
+  if (!session) {
+    return botInstance.sendMessage(chatId, "⚠️ Anda belum login. Silakan login terlebih dahulu dengan /start.");
+  }
+
+  const rawArg = match && match[1] ? match[1].trim() : "";
+  if (rawArg) {
+    const parsed = extractTimeAndDate(rawArg);
+    if (parsed.isCustomJam) {
+      try {
+        updateUserProfile(session.userId, { defaultJam: parsed.jam });
+        session.user.defaultJam = parsed.jam;
+      } catch (e) {}
+
+      return botInstance.sendMessage(
+        chatId,
+        `✅ *Jam Kerja Default Berhasil Diatur!*\n\n` +
+        `⏰ Jam kerja default Anda sekarang: \`${parsed.jam}\`\n\n` +
+        `Setiap jurnal yang Anda kirim tanpa menyebutkan jam akan otomatis menggunakan jam ini.\n\n` +
+        `_💡 Tips: Anda tetap bisa menentukan jam berbeda per kegiatan cukup dengan mengetiknya di pesan (contoh: "rapat dinas jam 08:00 - 11:30")._`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "🏛 Menu Utama", callback_data: "menu:main" }]]
+          }
+        }
+      );
+    }
+  }
+
+  return sendJamPicker(botInstance, chatId, session.user);
+}
+
+/**
+ * Tampilkan Menu Pilihan Jam Kerja Default
+ */
+export function sendJamPicker(botInstance, chatId, user) {
+  const currentJam = user.defaultJam || "08:00 - 16:00";
+  const text = `⏰ *PENGATURAN JAM KERJA JURNAL*\n\n` +
+    `• Jam Default Saat Ini: \`${currentJam}\`\n\n` +
+    `📌 *Cara Kerja Jam di Telegram:*\n` +
+    `1. *Otomatis (Default)*: Jika Anda kirim kegiatan tanpa menulis jam, jam otomatis diisi: \`${currentJam}\`.\n` +
+    `2. *Manual per Pesan*: Anda bebas menentukan jam berbeda pada pesan apa pun, contoh:\n` +
+    `   • \`rapat koordinasi jam 08:00 - 11:30\`\n` +
+    `   • \`pukul 07.30 - 15.00 workshop kurikulum\`\n` +
+    `   • \`jam 8-14 pengawasan asesmen\`\n\n` +
+    `Silakan pilih preset jam kerja default kantor Anda di bawah, atau ketik misal: \`/jam 07:30 - 16:00\`:`;
+
+  const inline_keyboard = [
+    [
+      { text: "⏰ 08:00 - 16:00 (Standar ASN)", callback_data: "jam:set_0800_1600" },
+      { text: "⏰ 07:30 - 16:00 (5 Hari)", callback_data: "jam:set_0730_1600" }
+    ],
+    [
+      { text: "⏰ 07:30 - 14:00 (Guru / 6 Hari)", callback_data: "jam:set_0730_1400" },
+      { text: "⏰ 08:00 - 15:30", callback_data: "jam:set_0800_1530" }
+    ],
+    [
+      { text: "✏️ Ketik Jam Manual (/jam ...)", callback_data: "jam:manual" }
+    ],
+    [
+      { text: "🏛 Menu Utama", callback_data: "menu:main" }
+    ]
+  ];
+
+  return botInstance.sendMessage(chatId, text, {
+    parse_mode: "Markdown",
+    reply_markup: { inline_keyboard }
+  });
+}
+
 // Pasang Event Listeners pada Bot jika Instance Aktif
 if (bot) {
   bot.onText(/^\/start(?:\s+(.*))?$/, (msg) => handleStart(bot, msg));
@@ -2026,6 +2264,7 @@ if (bot) {
   bot.onText(/^\/(?:setprofil|lengkapi)(?:\s+(.*))?$/, (msg, match) => handleSetProfile(bot, msg, match));
   bot.onText(/^\/batal$/, (msg) => handleCancel(bot, msg));
   bot.onText(/^\/(?:link|gdrive)(?:\s+(.*))?$/, (msg, match) => handleLinkCommand(bot, msg, match));
+  bot.onText(/^\/(?:jam|waktu)(?:\s+(.*))?$/, (msg, match) => handleJamCommand(bot, msg, match));
 
   // Handler callback_query untuk tombol interaktif (inline_keyboard)
   bot.on("callback_query", (query) => handleCallbackQuery(bot, query));
@@ -2050,7 +2289,10 @@ async function processMediaGroup(botInstance, mgId) {
 
   // Kasus A: Album dikirim DENGAN caption uraian tugas
   if (caption) {
-    const { url: detectedUrl, cleanText } = extractUrl(caption);
+    const { url: detectedUrl, cleanText: textAfterUrl } = extractUrl(caption);
+    const defaultUserJam = session.user.defaultJam || "08:00 - 16:00";
+    const { jam: finalJam, isCustomJam, tanggal: customDate, cleanText } = extractTimeAndDate(textAfterUrl, defaultUserJam);
+
     const polished = await polishJournalNode({
       rawText: cleanText,
       jabatan: session.user.jabatan,
@@ -2058,12 +2300,12 @@ async function processMediaGroup(botInstance, mgId) {
       apiKey: session.user.personalApiKey || ""
     });
 
-    const now = new Date().toISOString().slice(0, 10);
+    const now = customDate || new Date().toISOString().slice(0, 10);
     const primary = items[0];
     const newEntry = addJournal({
       userId: session.user.id,
       tanggal: now,
-      jam: "08:00 - 16:00",
+      jam: finalJam,
       aktivitas: polished.aktivitas,
       aktivitasKasaran: cleanText,
       outputJumlah: polished.outputJumlah,
@@ -2075,6 +2317,8 @@ async function processMediaGroup(botInstance, mgId) {
     });
 
     let reply = `📸 *Album (${items.length} Berkas) & Jurnal Berhasil Disimpan!* ✨\n\n` +
+      `📅 *Tanggal*: \`${now}\`\n` +
+      `⏰ *Waktu/Jam*: \`${finalJam}\`${isCustomJam ? " *(Sesuai input)*" : " *(Default)*"}\n\n` +
       `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
       `📊 *Output*: ${polished.outputJumlah}\n` +
       `🖼 *Bukti Lampiran*: *${items.length} Berkas* terunggah ke logbook.\n\n` +
@@ -2145,7 +2389,10 @@ async function handleIncomingAttachment(botInstance, msg, item) {
   // 2. Berkas tunggal DENGAN caption uraian tugas
   const rawCaption = msg.caption ? msg.caption.trim() : "";
   if (rawCaption) {
-    const { url: detectedUrl, cleanText } = extractUrl(rawCaption);
+    const { url: detectedUrl, cleanText: textAfterUrl } = extractUrl(rawCaption);
+    const defaultUserJam = session.user.defaultJam || "08:00 - 16:00";
+    const { jam: finalJam, isCustomJam, tanggal: customDate, cleanText } = extractTimeAndDate(textAfterUrl, defaultUserJam);
+
     const polished = await polishJournalNode({
       rawText: cleanText,
       jabatan: session.user.jabatan,
@@ -2153,11 +2400,11 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       apiKey: session.user.personalApiKey || ""
     });
 
-    const now = new Date().toISOString().slice(0, 10);
+    const now = customDate || new Date().toISOString().slice(0, 10);
     const newEntry = addJournal({
       userId: session.user.id,
       tanggal: now,
-      jam: "08:00 - 16:00",
+      jam: finalJam,
       aktivitas: polished.aktivitas,
       aktivitasKasaran: cleanText,
       outputJumlah: polished.outputJumlah,
@@ -2169,6 +2416,8 @@ async function handleIncomingAttachment(botInstance, msg, item) {
     });
 
     let reply = `✨ *Jurnal & Berkas Berhasil Disimpan ke Logbook!* ✨\n\n` +
+      `📅 *Tanggal*: \`${now}\`\n` +
+      `⏰ *Waktu/Jam*: \`${finalJam}\`${isCustomJam ? " *(Sesuai input)*" : " *(Default)*"}\n\n` +
       `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
       `📊 *Output*: ${polished.outputJumlah}\n` +
       `📎 *Lampiran Eviden*: \`${item.fileName}\` (${item.fileSize || (item.type === "image" ? "Foto Dokumentasi" : "Dokumen")})\n`;
