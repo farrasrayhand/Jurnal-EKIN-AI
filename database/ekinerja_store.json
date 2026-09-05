@@ -1,0 +1,105 @@
+{
+  "accounts": [
+    {
+      "id": "usr-superadmin",
+      "username": "superadmin",
+      "password": "scrypt:7544983c6d5ab4d7c2e7361287ec35a9:40cef4acdf950c513c4385a4860087561e06b9c2c677bd2a1fee81a087bf830402f7cc7447c72be4785f4da4bb88e1269d06f45493a04933135a0e75e1a89818",
+      "role": "superadmin",
+      "nama": "Super Administrator",
+      "nip": "-",
+      "pangkat": "Pembina Tk. I / IV/b",
+      "jabatan": "Kepala Laboratorium TI",
+      "unitKerja": "Balai Teknologi Informasi Pendidikan",
+      "allowEnvKey": true,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-09-05T07:51:30.495Z"
+    },
+    {
+      "id": "usr-farras",
+      "username": "farras",
+      "password": "pegawai123",
+      "role": "pegawai",
+      "nama": "MUHAMMAD FARRAS RAYHAND",
+      "nip": "200011192025211007",
+      "pangkat": "Pengatur Muda / II/a",
+      "jabatan": "PENGADMINISTRASI PERKANTORAN",
+      "unitKerja": "SMK N 07 SAMARINDA",
+      "allowEnvKey": true,
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "usr-budi",
+      "username": "budi.santoso",
+      "password": "pegawai123",
+      "role": "pegawai",
+      "nama": "BUDI SANTOSO, S.Kom",
+      "nip": "198507122010011008",
+      "pangkat": "Penata Muda Tk. I / III/b",
+      "jabatan": "Pranata Komputer Ahli Pertama",
+      "unitKerja": "SMK N 07 SAMARINDA",
+      "allowEnvKey": true,
+      "createdAt": "2026-01-05T00:00:00.000Z"
+    }
+  ],
+  "journals": [
+    {
+      "id": "jrn-1788586761671",
+      "createdAt": "2026-09-05T05:39:21.671Z",
+      "userId": "usr-farras",
+      "tanggal": "2026-07-20",
+      "jam": "08:00 - 16:00",
+      "aktivitas": "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi penanganan kendala konektivitas jaringan internet ruang guru yg mati serta setting mikrotik lab.",
+      "aktivitasKasaran": "tadi benerin wifi",
+      "outputJumlah": "1 Berkas Berita Acara Perbaikan",
+      "catatan": "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.",
+      "source": "telegram"
+    },
+    {
+      "id": "jrn-smk-01",
+      "userId": "usr-farras",
+      "tanggal": "2026-07-02",
+      "jam": "08:00 - 11:30",
+      "aktivitas": "Melaksanakan pengelolaan surat masuk kedinasan, pencatatan agenda surat dinas serta pendistribusian lembar disposisi",
+      "aktivitasKasaran": "catat surat masuk dinas trs bagiin disposisi",
+      "outputJumlah": "1 Berkas Buku Agenda Surat Masuk",
+      "catatan": "Surat dinas terdistribusi secara tertib ke unit kerja terkait.",
+      "linkUrl": "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz"
+    },
+    {
+      "id": "jrn-smk-02",
+      "userId": "usr-farras",
+      "tanggal": "2026-07-08",
+      "jam": "08:30 - 14:00",
+      "aktivitas": "Melakukan verifikasi kelengkapan berkas administrasi kepegawaian dan sinkronisasi arsip digital berkas kenaikan pangkat",
+      "aktivitasKasaran": "cek berkas kenaikan pangkat pegawai",
+      "outputJumlah": "1 Berkas Dokumen Verifikasi Arsip",
+      "catatan": "Seluruh berkas persyaratan ASN dinyatakan lengkap sesuai checklist.",
+      "linkUrl": "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz"
+    },
+    {
+      "id": "jrn-smk-03",
+      "userId": "usr-farras",
+      "tanggal": "2026-07-15",
+      "jam": "09:00 - 12:00",
+      "aktivitas": "Menyusun draf laporan rekapitulasi kehadiran berkala pegawai serta penyiapan dokumentasi rapat dinas bulanan",
+      "aktivitasKasaran": "bikin rekap presensi dan siapin notula rapat dinas",
+      "outputJumlah": "1 Dokumen Notula & Daftar Hadir",
+      "catatan": "Laporan presensi dan notula telah divalidasi pimpinan.",
+      "linkUrl": "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz"
+    }
+  ],
+  "telegramSessions": {},
+  "penilai": {
+    "nama": "ANDA SUPANDA, S.Pd, M.Pd",
+    "nip": "197505201998021001",
+    "pangkat": "Pembina Tingkat I / IV/b",
+    "jabatan": "Kepala Sekolah",
+    "unitKerja": "SMK N 07 SAMARINDA"
+  },
+  "settings": {
+    "gdriveLink": ""
+  },
+  "updatedAt": "2026-09-05T07:49:33.084Z",
+  "registrationCodes": [],
+  "webSessions": {}
+}
