@@ -426,6 +426,7 @@ export function updateUserProfile(userId, profileData) {
     pangkat: profileData.pangkat !== undefined && profileData.pangkat !== "" ? profileData.pangkat.trim() : current.pangkat,
     jabatan: profileData.jabatan !== undefined && profileData.jabatan !== "" ? profileData.jabatan.trim() : current.jabatan,
     unitKerja: profileData.unitKerja !== undefined && profileData.unitKerja !== "" ? profileData.unitKerja.trim() : current.unitKerja,
+    gdriveLink: profileData.gdriveLink !== undefined ? profileData.gdriveLink.trim() : (current.gdriveLink || ""),
     updatedAt: new Date().toISOString()
   };
 

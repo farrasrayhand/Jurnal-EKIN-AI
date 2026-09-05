@@ -63,6 +63,9 @@ const registrationStates = new Map();
 // Map Antrean Bukti/Eviden Tanpa Caption (chatId -> { type: 'image'|'document', filePath, fileName, fileSize, createdAt })
 const pendingUploads = new Map();
 
+// Map Setup Link Google Drive Bukti Dukung (chatId -> { returnTo: "report"|"profile"|"main" })
+const linkSetupStates = new Map();
+
 // Preset Pangkat/Golongan ASN & PPPK resmi BKN (ID pendek < 64 bytes untuk Telegram Callback)
 export const PANGKAT_PRESETS = {
   p4e: "Pembina Utama / IV/e",
@@ -506,19 +509,34 @@ export function sendReportMonthPicker(botInstance, chatId) {
     [{ text: `📅 ${NAMA_BULAN_INDONESIA[m4]} ${y4}`, callback_data: `report:${pad(m4)}:${y4}` }]
   ];
 
+  const userGdrive = (session.user.gdriveLink || "").trim();
+  const gdriveStatus = userGdrive
+    ? `🔗 *Link Google Drive (Footer PDF):*\n\`${userGdrive}\`\n_(Tercantum aktif pada footer Laporan PDF)_\n\n`
+    : `🔗 *Link Google Drive (Footer PDF):*\n_Belum diatur (footer PDF disembunyikan)_\n\n`;
+
   if (![m1, m2, m3, m4].includes(6) || year !== 2026) {
     monthRows.push([
       { text: `📅 Juli 2026 (Data Demo)`, callback_data: `report:07:2026` }
     ]);
   }
 
+  // Tombol untuk memasukkan atau mengubah link Google Drive
+  monthRows.push([
+    {
+      text: userGdrive ? "🔗 Ubah Link Google Drive" : "🔗 Masukkan Link Google Drive",
+      callback_data: "link:prompt"
+    }
+  ]);
+
   monthRows.push([
     { text: `🏛 Kembali ke Menu Utama`, callback_data: "menu:main" }
   ]);
 
   const text = `📄 *PILIH BULAN LAPORAN PDF & ZIP*\n\n` +
+    gdriveStatus +
     `Silakan tekan salah satu tombol bulan di bawah untuk langsung mengunduh Dokumen Laporan Kinerja & Berkas Lampiran ZIP:\n\n` +
-    `_Atau ketik format manual:_ \`/laporan [bulan] [tahun]\` (contoh: \`/laporan Juli 2026\`)`;
+    `_Format manual:_ \`/laporan [bulan] [tahun] [link_gdrive]\`\n` +
+    `_Contoh:_ \`/laporan Juli 2026\` atau \`/laporan Juli 2026 https://drive.google.com/...\``;
 
   return botInstance.sendMessage(chatId, text, {
     parse_mode: "Markdown",
@@ -760,6 +778,65 @@ export async function handleCallbackQuery(botInstance, query) {
     const year = parts[2] || String(new Date().getFullYear());
 
     return handleReport(botInstance, { chat: { id: chatId } }, ["", `${month} ${year}`]);
+  }
+
+  // E. Pengaturan Link Google Drive Bukti Dukung (link:*)
+  if (data.startsWith("link:")) {
+    if (!session) {
+      return botInstance.sendMessage(chatId, "⚠️ Sesi Anda telah berakhir. Silakan login kembali.");
+    }
+
+    const sub = data.replace("link:", "");
+
+    if (sub === "prompt") {
+      linkSetupStates.set(chatId, { returnTo: "report" });
+      const currentLink = session.user.gdriveLink || "";
+      return botInstance.sendMessage(
+        chatId,
+        `🔗 *PENGATURAN LINK GOOGLE DRIVE BUKTI DUKUNG*\n\n` +
+        `Tautan ini akan dicantumkan pada *Catatan Kaki (Footer)* dokumen resmi Laporan Kinerja PDF bulanan Anda.\n\n` +
+        `• *Status saat ini*: ${currentLink ? `\`${currentLink}\`` : `_Belum diatur (footer PDF disembunyikan)_`}\n\n` +
+        `Silakan *kirim tautan / URL folder Google Drive* Anda sekarang (balas pesan ini):\n` +
+        `_Contoh:_ \`https://drive.google.com/drive/folders/...\`\n\n` +
+        `_(Ketik \`hapus\` untuk mengosongkan/sembunyikan footer, atau klik Batal di bawah)_`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "❌ Batal", callback_data: "link:cancel" }]]
+          }
+        }
+      );
+    }
+
+    if (sub === "clear") {
+      try {
+        updateUserProfile(session.userId, { gdriveLink: "" });
+      } catch (e) {}
+
+      await botInstance.sendMessage(
+        chatId,
+        `🗑 *Link Google Drive Dikosongkan!* ✅\n\n` +
+        `Catatan kaki link Google Drive pada footer dokumen laporan PDF kini disembunyikan.`,
+        { parse_mode: "Markdown" }
+      );
+      return sendReportMonthPicker(botInstance, chatId);
+    }
+
+    if (sub === "cancel") {
+      linkSetupStates.delete(chatId);
+      return botInstance.sendMessage(
+        chatId,
+        `ℹ️ Pengaturan link Google Drive dibatalkan.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+              [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+            ]
+          }
+        }
+      );
+    }
   }
 }
 
@@ -1013,6 +1090,10 @@ export function handleCancel(botInstance, msg) {
     pendingUploads.delete(chatId);
     cancelled = true;
   }
+  if (linkSetupStates.has(chatId)) {
+    linkSetupStates.delete(chatId);
+    cancelled = true;
+  }
 
   if (cancelled) {
     return botInstance.sendMessage(chatId, `ℹ️ Proses pengisian data / antrean berkas telah dibatalkan.`);
@@ -1029,6 +1110,7 @@ export function handleLogout(botInstance, msg) {
 
   profileSetupStates.delete(chatId);
   loginStates.delete(chatId);
+  linkSetupStates.delete(chatId);
 
   if (!session) {
     return botInstance.sendMessage(chatId, "ℹ️ Anda saat ini memang belum login.");
@@ -1082,6 +1164,7 @@ export function handleProfile(botInstance, msg) {
     `🎖 *Pangkat/Gol*: ${user.pangkat || "-"}\n` +
     `💼 *Jabatan*: ${user.jabatan || "-"}\n` +
     `🏢 *Unit Kerja*: ${user.unitKerja || "-"}\n` +
+    `🔗 *Link Google Drive (Footer PDF)*: ${user.gdriveLink ? `\`${user.gdriveLink}\`` : "_Belum diatur (footer disembunyikan)_"}\n` +
     `🔐 *Role*: ${user.role || "pegawai"}\n\n`;
 
   if (isIncomplete) {
@@ -1099,9 +1182,10 @@ export function handleProfile(botInstance, msg) {
   const inline_keyboard = [
     [
       { text: "⚙️ Atur Data Diri", callback_data: "menu:setprofil" },
-      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }
+      { text: user.gdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" }
     ],
     [
+      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
       { text: "🏛 Menu Utama", callback_data: "menu:main" }
     ]
   ];
@@ -1214,6 +1298,14 @@ export async function handleReport(botInstance, msg, match) {
   let targetMonth = String(now.getMonth() + 1).padStart(2, "0");
   let targetYear = String(now.getFullYear());
 
+  let urlArg = "";
+  for (const p of parts) {
+    if (p.startsWith("http://") || p.startsWith("https://") || p.includes("drive.google.com")) {
+      urlArg = p.trim();
+      break;
+    }
+  }
+
   if (parts.length >= 1) {
     const p0 = parts[0].toLowerCase();
     if (NAMA_BULAN_MAP[p0]) {
@@ -1230,6 +1322,19 @@ export async function handleReport(botInstance, msg, match) {
     }
   }
 
+  // Jika user menyertakan URL baru di perintah /laporan, simpan permanen ke profil user
+  let activeUser = user;
+  if (urlArg) {
+    try {
+      activeUser = updateUserProfile(user.id, { gdriveLink: urlArg });
+    } catch (e) {
+      console.warn("Gagal menyimpan link drive profil:", e);
+    }
+  }
+
+  const { settings } = getSettings();
+  const effectiveGdriveLink = (urlArg || activeUser.gdriveLink || settings?.gdriveLink || "").trim();
+
   const monthIdx = parseInt(targetMonth, 10) - 1;
   const monthName = NAMA_BULAN_INDONESIA[monthIdx] || targetMonth;
 
@@ -1237,7 +1342,8 @@ export async function handleReport(botInstance, msg, match) {
     chatId,
     `⏳ *Sedang menyusun Laporan Kinerja PDF...*\n` +
     `• Periode: *Bulan ${monthName} ${targetYear}*\n` +
-    `• Pegawai: *${user.nama}*\n\n` +
+    `• Pegawai: *${activeUser.nama}*\n` +
+    (effectiveGdriveLink ? `• Link Drive: \`${effectiveGdriveLink}\`\n\n` : `• Link Drive: _(Tidak ada, footer disembunyikan)_\n\n`) +
     `Mohon tunggu beberapa detik...`,
     { parse_mode: "Markdown" }
   );
@@ -1245,19 +1351,22 @@ export async function handleReport(botInstance, msg, match) {
   try {
     botInstance.sendChatAction(chatId, "upload_document");
 
-    const userJournals = getJournals(user.id);
-    const { settings } = getSettings();
+    const userJournals = getJournals(activeUser.id);
 
     const reportBundle = await generateMonthlyReportZip({
-      pegawai: user,
+      pegawai: activeUser,
       journals: userJournals,
       month: targetMonth,
       year: targetYear,
-      gdriveLink: settings?.gdriveLink || "",
+      gdriveLink: effectiveGdriveLink,
       uploadsDir: UPLOADS_DIR
     });
 
     const { pdfBuffer, pdfFileName, zipBuffer, zipFileName, attachmentCount } = reportBundle;
+
+    const gdriveCaptionNote = effectiveGdriveLink
+      ? `🔗 *Link Google Drive Bukti Dukung:*\n\`${effectiveGdriveLink}\` (Tercantum di footer PDF)\n\n`
+      : `ℹ️ _Catatan: Link Google Drive belum diatur (footer disembunyikan). Ketik /link <url> untuk memasang._\n\n`;
 
     // 1. Kirim Laporan Utama PDF A4
     await botInstance.sendDocument(
@@ -1266,8 +1375,9 @@ export async function handleReport(botInstance, msg, match) {
       {
         caption: `📄 *Laporan Bulanan Kinerja Pegawai*\n` +
           `🗓 Periode: *${monthName} ${targetYear}*\n` +
-          `👤 Nama: *${user.nama}*\n` +
-          `💳 NIP: \`${user.nip || "-"}\`\n\n` +
+          `👤 Nama: *${activeUser.nama}*\n` +
+          `💳 NIP: \`${activeUser.nip || "-"}\`\n\n` +
+          gdriveCaptionNote +
           `✅ Dokumen A4 resmi standar PermenPAN-RB No. 6 Tahun 2022 siap dicetak atau dilampirkan ke aplikasi e-Kinerja BKN.`
       },
       {
@@ -1302,6 +1412,7 @@ export async function handleReport(botInstance, msg, match) {
         { text: "📄 Unduh Bulan Lain", callback_data: "menu:laporan" }
       ],
       [
+        { text: effectiveGdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" },
         { text: "🏛 Menu Utama", callback_data: "menu:main" }
       ]
     ];
@@ -1520,6 +1631,85 @@ export async function handleIncomingText(botInstance, msg) {
     });
   }
 
+  // B.1 Jika Pengguna Sedang dalam Alur Pengaturan Link Google Drive Bukti Dukung
+  if (linkSetupStates.has(chatId)) {
+    const cleanText = text.trim();
+    linkSetupStates.delete(chatId);
+
+    if (cleanText.toLowerCase() === "batal" || cleanText.toLowerCase() === "/batal") {
+      return botInstance.sendMessage(
+        chatId,
+        `ℹ️ Pengaturan link Google Drive dibatalkan.`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+              [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+            ]
+          }
+        }
+      );
+    }
+
+    if (["hapus", "kosong", "-", "clear", "reset"].includes(cleanText.toLowerCase())) {
+      try {
+        updateUserProfile(session.userId, { gdriveLink: "" });
+      } catch (e) {}
+
+      await botInstance.sendMessage(
+        chatId,
+        `🗑 *Link Google Drive Dikosongkan!* ✅\n\n` +
+        `Catatan kaki (footer) link Google Drive pada laporan PDF kini disembunyikan.`,
+        { parse_mode: "Markdown" }
+      );
+      return sendReportMonthPicker(botInstance, chatId);
+    }
+
+    const urlMatch = cleanText.match(/(https?:\/\/[^\s]+)/i);
+    const validUrl = urlMatch ? urlMatch[1] : (cleanText.startsWith("http") ? cleanText : "");
+
+    if (!validUrl) {
+      linkSetupStates.set(chatId, { returnTo: "report" });
+      return botInstance.sendMessage(
+        chatId,
+        `⚠️ *Format Tautan Tidak Valid!*\n\n` +
+        `Pastikan tautan diawali dengan \`https://\` atau \`http://\`.\n\n` +
+        `*Contoh:* \`https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz\`\n\n` +
+        `_Ketik \`batal\` untuk membatalkan atau \`hapus\` untuk mengosongkan._`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "❌ Batal", callback_data: "link:cancel" }]]
+          }
+        }
+      );
+    }
+
+    try {
+      updateUserProfile(session.userId, { gdriveLink: validUrl });
+    } catch (e) {
+      console.warn("Gagal update link profil:", e);
+    }
+
+    // Sambungkan juga ke jurnal terbaru jika ada
+    const userJournals = getJournals(session.userId);
+    if (userJournals.length > 0) {
+      userJournals[0].linkUrl = validUrl;
+      const store = getStore();
+      saveStore(store);
+    }
+
+    await botInstance.sendMessage(
+      chatId,
+      `✅ *Tautan Google Drive Berhasil Disimpan!*\n\n` +
+      `🔗 \`${validUrl}\`\n\n` +
+      `Tautan ini otomatis dicantumkan di bagian **Catatan Kaki (Footer)** dokumen cetak Laporan Kinerja PDF bulanan Anda sebagai bukti dukung digital.`,
+      { parse_mode: "Markdown" }
+    );
+
+    return sendReportMonthPicker(botInstance, chatId);
+  }
+
   // B. Jika Pengguna Sedang dalam Alur Pengisian Profil Bertahap
   if (profileSetupStates.has(chatId)) {
     const state = profileSetupStates.get(chatId);
@@ -1704,7 +1894,7 @@ export async function handleIncomingText(botInstance, msg) {
 }
 
 /**
- * Handler Perintah /link <url> (Menautkan link drive ke jurnal terakhir atau default)
+ * Handler Perintah /link [url] dan /gdrive [url] (Menyimpan tautan Google Drive bukti dukung ke profil & footer PDF)
  */
 export function handleLinkCommand(botInstance, msg, match) {
   const chatId = msg.chat.id;
@@ -1714,41 +1904,107 @@ export function handleLinkCommand(botInstance, msg, match) {
     return botInstance.sendMessage(chatId, `⚠️ Anda belum login. Ketik \`/login <username> <password>\``, { parse_mode: "Markdown" });
   }
 
-  const rawUrl = match && match[1] ? match[1].trim() : "";
-  if (!rawUrl || !rawUrl.startsWith("http")) {
-    return botInstance.sendMessage(
-      chatId,
-      `⚠️ *Format Tautan Tidak Valid!*\n\n` +
-      `Gunakan format:\n\`/link https://drive.google.com/drive/folders/...\`\n\n` +
-      `Tautan ini akan otomatis dilampirkan sebagai bukti eviden digital pada jurnal terbaru Anda.`,
-      { parse_mode: "Markdown" }
-    );
-  }
+  const rawArg = match && match[1] ? match[1].trim() : "";
+  const lowerArg = rawArg.toLowerCase();
 
-  const userJournals = getJournals(session.userId);
-  if (userJournals.length > 0) {
-    const latest = userJournals[0];
-    latest.linkUrl = rawUrl;
-    // Simpan perubahan
-    const store = getStore();
-    saveStore(store);
+  // Kasus 1: Menghapus / mengosongkan link Google Drive
+  if (lowerArg === "hapus" || lowerArg === "kosong" || lowerArg === "-" || lowerArg === "clear" || lowerArg === "reset") {
+    try {
+      updateUserProfile(session.userId, { gdriveLink: "" });
+    } catch (e) {}
 
     return botInstance.sendMessage(
       chatId,
-      `🔗 *Tautan Berhasil Ditautkan!* ✅\n\n` +
-      `Tautan telah dilampirkan ke jurnal kerja terbaru:\n` +
-      `• *Aktivitas*: _${latest.aktivitas}_\n` +
-      `• *Tautan*: ${rawUrl}\n\n` +
-      `Tautan ini akan tercetak aktif pada dokumen laporan PDF bulanan Anda.`,
-      { parse_mode: "Markdown" }
+      `🗑 *Link Google Drive Dikosongkan!* ✅\n\n` +
+      `Catatan kaki (footer) link Google Drive pada dokumen cetak Laporan Kinerja PDF Anda kini *disembunyikan*.\n\n` +
+      `Untuk memasang tautan kembali, ketik:\n\`/link <url_folder_google_drive>\``,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+            [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+          ]
+        }
+      }
     );
   }
 
-  return botInstance.sendMessage(
-    chatId,
-    `ℹ️ Anda belum memiliki catatan jurnal. Silakan kirimkan aktivitas kerja Anda terlebih dahulu.`,
-    { parse_mode: "Markdown" }
-  );
+  // Kasus 2: User memasukkan URL (baik diawali http atau link drive)
+  if (rawArg) {
+    const urlMatch = rawArg.match(/(https?:\/\/[^\s]+)/i);
+    const validUrl = urlMatch ? urlMatch[1] : (rawArg.startsWith("http") ? rawArg : "");
+
+    if (!validUrl) {
+      return botInstance.sendMessage(
+        chatId,
+        `⚠️ *Format Tautan Tidak Valid!*\n\n` +
+        `Pastikan tautan diawali dengan \`https://\` atau \`http://\`.\n\n` +
+        `*Contoh:* \`/link https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz\`\n\n` +
+        `_Ketik \`/link hapus\` jika ingin mengosongkan link di footer PDF._`,
+        { parse_mode: "Markdown" }
+      );
+    }
+
+    try {
+      updateUserProfile(session.userId, { gdriveLink: validUrl });
+    } catch (e) {
+      console.warn("Gagal update link profil:", e);
+    }
+
+    // Juga sematkan ke jurnal terbaru jika ada
+    const userJournals = getJournals(session.userId);
+    if (userJournals.length > 0) {
+      userJournals[0].linkUrl = validUrl;
+      const store = getStore();
+      saveStore(store);
+    }
+
+    return botInstance.sendMessage(
+      chatId,
+      `🔗 *Tautan Google Drive Berhasil Disimpan!* ✅\n\n` +
+      `• *URL Terdaftar*: \`${validUrl}\`\n\n` +
+      `📌 *Dampak Pengaturan:*\n` +
+      `1. Tautan ini otomatis tercantum aktif pada *Catatan Kaki (Footer)* dokumen resmi Laporan Kinerja PDF bulanan Anda sebagai bukti dukung digital BKN.\n` +
+      `2. Tautan juga dilampirkan pada indeks pendukung berkas bukti dukung digital.\n\n` +
+      `_Silakan unduh dokumen laporan PDF Anda melalui tombol di bawah:_`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📄 Unduh Laporan PDF Sekarang", callback_data: "menu:laporan" }],
+            [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+          ]
+        }
+      }
+    );
+  }
+
+  // Kasus 3: User mengetik /link atau /gdrive tanpa argumen -> Tampilkan Menu Status & Opsi
+  const currentLink = session.user.gdriveLink || "";
+  const text = `🔗 *PENGATURAN LINK GOOGLE DRIVE BUKTI DUKUNG*\n\n` +
+    `Tautan folder Google Drive ini berfungsi sebagai bukti eviden digital yang dicantumkan pada *Catatan Kaki (Footer)* Laporan Kinerja Bulanan PDF resmi BKN.\n\n` +
+    `• *Status Saat Ini*: ${currentLink ? `\`${currentLink}\`\n_(Aktif tercantum di footer PDF)_` : `_Belum diatur (footer PDF disembunyikan)_`}\n\n` +
+    `📌 *Cara Penggunaan:*\n` +
+    `• Ketik perintah langsung: \`/link <url_folder_drive>\`\n` +
+    `• Atau klik tombol *Atur / Ubah Link* di bawah ini.\n` +
+    `• Ketik \`/link hapus\` untuk mengosongkan link.`;
+
+  const inline_keyboard = [
+    [
+      { text: currentLink ? "🔗 Ubah Link Google Drive" : "🔗 Masukkan Link Google Drive", callback_data: "link:prompt" },
+      ...(currentLink ? [{ text: "🗑 Hapus Link", callback_data: "link:clear" }] : [])
+    ],
+    [
+      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
+      { text: "🏛 Menu Utama", callback_data: "menu:main" }
+    ]
+  ];
+
+  return botInstance.sendMessage(chatId, text, {
+    parse_mode: "Markdown",
+    reply_markup: { inline_keyboard }
+  });
 }
 
 // Pasang Event Listeners pada Bot jika Instance Aktif
@@ -1769,7 +2025,7 @@ if (bot) {
   bot.onText(/^\/laporan(?:\s+(.*))?$/, (msg, match) => handleReport(bot, msg, match));
   bot.onText(/^\/(?:setprofil|lengkapi)(?:\s+(.*))?$/, (msg, match) => handleSetProfile(bot, msg, match));
   bot.onText(/^\/batal$/, (msg) => handleCancel(bot, msg));
-  bot.onText(/^\/link(?:\s+(.*))?$/, (msg, match) => handleLinkCommand(bot, msg, match));
+  bot.onText(/^\/(?:link|gdrive)(?:\s+(.*))?$/, (msg, match) => handleLinkCommand(bot, msg, match));
 
   // Handler callback_query untuk tombol interaktif (inline_keyboard)
   bot.on("callback_query", (query) => handleCallbackQuery(bot, query));
