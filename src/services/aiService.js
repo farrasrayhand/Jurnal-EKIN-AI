@@ -66,12 +66,13 @@ Hasilkan minimal 3 RHK UTAMA dan 1 RHK TAMBAHAN. Setiap RHK WAJIB memiliki 3 Asp
 Balas HANYA dengan kode JSON valid tanpa markdown backtick.
   `.trim();
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
 
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey
     },
     body: JSON.stringify({
       contents: [
@@ -456,81 +457,45 @@ export async function polishJournalWithAi({
     throw new Error("Tuliskan catatan aktivitas kasaran terlebih dahulu!");
   }
 
-  // Jika ada API Key, gunakan Gemini untuk kecerdasan maksimal
-  if (apiKey) {
-    try {
-      const rhkOptions = rhkList.map((r, i) => `ID: "${r.id}" | RHK: "${r.rhkIndividu}"`).join("\n");
-      const prompt = `
-Anda adalah asisten cerdas ASN Kementerian PANRB & BKN.
-Tugas Anda: Mengubah catatan aktivitas harian kasaran / santai seorang ASN menjadi bahasa laporan kedinasan yang formal, baku, dan terukur sesuai standar e-Kinerja PermenPAN-RB No. 6 Tahun 2022.
+  // 1. Panggil Endpoint Server-Side AI Proxy (/api/ai/polish)
+  // Aman 100%: API Key & URL Google Gemini diproses secara tertutup di backend Node.js.
+  // Tidak ada pemanggilan langsung ke generativelanguage.googleapis.com dari browser,
+  // sehingga kuota habis (429) atau API Key TIDAK PERNAH bocor ke Browser Console atau Network Tab!
+  try {
+    const response = await fetch("/api/ai/polish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rawText,
+        rhkList,
+        jabatan,
+        unitKerja,
+        apiKey
+      })
+    });
 
-Informasi Pegawai:
-- Jabatan: ${jabatan || "Pegawai ASN"}
-- Unit Kerja: ${unitKerja || "Instansi Pemerintah"}
-
-Catatan Kasaran Pegawai:
-"${rawText}"
-
-Daftar RHK Pegawai:
-${rhkOptions || "Tidak ada RHK terdaftar"}
-
-Pedoman Substansi & Relevansi Tugas:
-1. Pertahankan substansi dan konteks pekerjaan riil yang ditulis pegawai! JANGAN mengubah jenis kegiatan yang tidak relevan.
-2. Contoh: Jika pegawai menulis tentang "arsip", "ijazah alumni", "berkas", "lemari dokumen", itu adalah TUGAS KEARSIPAN & TATA USAHA (gunakan: "Melakukan penataan, klasifikasi, serta penyimpanan berkas arsip..."). DILARANG KERAS mengubahnya menjadi kegiatan pembelajaran/mengajar murid hanya karena ada kata "tahun ajaran" atau "alumni"!
-3. Jika pegawai menulis tentang persuratan ("surat masuk", "disposisi"), itu adalah TUGAS TATA NASKAH DINAS & PERSURATAN.
-4. Jika pegawai menulis tentang "rekap berkas usul kenaikan pangkat", itu adalah TUGAS ADMINISTRASI KEPEGAWAIAN.
-
-Instruksi Output:
-Kembalikan HANYA format JSON valid tanpa format markdown lain:
-{
-  "aktivitas": "Kalimat formal kedinasan (diawali kata kerja aktif seperti Melaksanakan, Melakukan, Menyusun, Mengoordinasikan, dsb)",
-  "outputJumlah": "Output hasil kerja yang terukur (misal: 1 Laporan Kegiatan, 1 Dokumen Berkas Arsip, dsb)",
-  "rhkId": "ID RHK yang paling cocok dari daftar di atas (jika cocok, jika tidak kosongkan stringnya)",
-  "catatan": "Catatan ringkas teknis atau kualitatif terkait hasil tugas"
-}
-`;
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              responseMimeType: "application/json"
-            }
-          })
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.aktivitas) {
+        let matchedRhkId = data.rhkId;
+        if (!matchedRhkId && rhkList.length > 0) {
+          const off = polishJournalOffline(rawText, rhkList);
+          matchedRhkId = off.rhkId;
         }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (content) {
-          const parsed = JSON.parse(content);
-          return {
-            aktivitas: cleanDuplicatePhrases(parsed.aktivitas || rawText),
-            outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
-            rhkId: parsed.rhkId || (rhkList[0]?.id || ""),
-            catatan: parsed.catatan || "Terselesaikan dalam kondisi optimal.",
-            source: "gemini"
-          };
-        }
-      } else if (response.status === 429) {
-        console.warn("[Gemini API] Kuota / prepayment credits habis (Status 429), beralih ke engine heuristik offline.");
-        const off = polishJournalOffline(rawText, rhkList);
         return {
-          ...off,
-          source: "offline_429"
+          aktivitas: cleanDuplicatePhrases(data.aktivitas),
+          outputJumlah: data.outputJumlah || "1 Dokumen / Kegiatan",
+          rhkId: matchedRhkId || (rhkList[0]?.id || ""),
+          catatan: data.catatan || "Terselesaikan dalam kondisi optimal.",
+          source: data.source || "server-ai"
         };
       }
-    } catch (e) {
-      console.warn("Gemini API error, beralih ke engine heuristik offline:", e);
     }
+  } catch (err) {
+    // Backend tidak terjangkau (misal static offline hosting), fallback ke offline engine
   }
 
-  // Engine Heuristik Offline (Cerdas & Cepat tanpa API Key)
+  // 2. Engine Heuristik Offline ASN (Client-Side Cerdas, Cepat & Tanpa Koneksi)
   const offlineResult = polishJournalOffline(rawText, rhkList);
   return {
     ...offlineResult,

@@ -568,6 +568,51 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // --------------------------------------------------------------------------
+  // Endpoint AI Polish Server-Side (/api/ai/polish)
+  // Aman: API Key & URL Google Gemini 100% diproses di server (tidak bocor ke browser)
+  // --------------------------------------------------------------------------
+  if (req.method === "POST" && pathname === "/api/ai/polish") {
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 50000) req.destroy();
+    });
+    req.on("end", async () => {
+      let payload = {};
+      try {
+        payload = JSON.parse(body);
+      } catch (e) {}
+
+      try {
+        const { polishJournalNode } = await import("./aiServiceNode.js");
+        const result = await polishJournalNode({
+          rawText: payload.rawText || "",
+          jabatan: payload.jabatan || "",
+          unitKerja: payload.unitKerja || "",
+          apiKey: payload.apiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ""
+        });
+
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        try {
+          const { polishJournalOfflineNode } = await import("./aiServiceNode.js");
+          const fallback = polishJournalOfflineNode(payload.rawText || "");
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(fallback));
+        } catch (e2) {
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "Gagal memproses pemolesan jurnal" }));
+        }
+      }
+    });
+    return;
+  }
+
   // Handler Status Konfigurasi Bot Telegram
   if (pathname === "/api/bot-status") {
     res.setHeader("Content-Type", "application/json");

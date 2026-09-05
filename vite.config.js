@@ -67,6 +67,46 @@ function apiSyncPlugin() {
         res.end(JSON.stringify(getBotConfig()))
       })
 
+      // Endpoint AI Polish Server-Side (/api/ai/polish)
+      server.middlewares.use('/api/ai/polish', (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method Not Allowed')
+          return
+        }
+        let body = ''
+        req.on('data', chunk => (body += chunk))
+        req.on('end', async () => {
+          let payload = {}
+          try {
+            payload = JSON.parse(body)
+          } catch (e) {}
+
+          try {
+            const { polishJournalNode } = await import('./server/aiServiceNode.js')
+            const result = await polishJournalNode({
+              rawText: payload.rawText || '',
+              jabatan: payload.jabatan || '',
+              unitKerja: payload.unitKerja || '',
+              apiKey: payload.apiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ''
+            })
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(result))
+          } catch (err) {
+            try {
+              const { polishJournalOfflineNode } = await import('./server/aiServiceNode.js')
+              const fallback = polishJournalOfflineNode(payload.rawText || '')
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify(fallback))
+            } catch (e2) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'Gagal memproses pemolesan AI' }))
+            }
+          }
+        })
+      })
+
       // Endpoint Autentikasi Login Aman Server-Side
       server.middlewares.use('/api/auth/login', (req, res) => {
         if (req.method !== 'POST') {

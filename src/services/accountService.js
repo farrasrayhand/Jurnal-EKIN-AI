@@ -1017,13 +1017,7 @@ export function getDatabaseConfig() {
 
   return {
     type: dbType, // "mysql" | "postgres" | "sqlite"
-    label: dbType === "mysql" ? "MySQL / MariaDB" : dbType === "postgres" ? "PostgreSQL" : "SQLite (Local File)",
-    host: import.meta.env.VITE_DB_HOST || "localhost",
-    port: import.meta.env.VITE_DB_PORT || (dbType === "postgres" ? "5432" : dbType === "mysql" ? "3306" : ""),
-    name: import.meta.env.VITE_DB_NAME || "db_ekin",
-    user: import.meta.env.VITE_DB_USER || (dbType === "postgres" ? "postgres" : "root"),
-    sqliteFile: import.meta.env.VITE_SQLITE_FILE || "./database/ekinerja.sqlite",
-    databaseUrl: import.meta.env.VITE_DATABASE_URL || ""
+    label: dbType === "mysql" ? "MySQL / MariaDB" : dbType === "postgres" ? "PostgreSQL" : "SQLite (Local File)"
   };
 }
 
