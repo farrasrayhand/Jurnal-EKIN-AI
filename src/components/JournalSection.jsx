@@ -68,13 +68,15 @@ export default function JournalSection({
         // Upload ke backend /api/upload agar memiliki URL link langsung di aplikasi
         let serverFileUrl = "";
         let serverStoredName = "";
+        let finalFileName = processed.name;
         try {
           const uploadRes = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               fileName: processed.name,
-              fileData: processed.dataUrl
+              fileData: processed.dataUrl,
+              tanggal: formData.tanggal || new Date().toISOString().slice(0, 10)
             })
           });
           if (uploadRes.ok) {
@@ -84,6 +86,9 @@ export default function JournalSection({
             }
             if (upJson?.storedName) {
               serverStoredName = upJson.storedName;
+            }
+            if (upJson?.fileName) {
+              finalFileName = upJson.fileName;
             }
           }
         } catch (netErr) {
@@ -95,7 +100,7 @@ export default function JournalSection({
           id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           type: isImg ? "image" : "document",
           docCategory: isImg ? "image" : processed.type,
-          fileName: processed.name,
+          fileName: finalFileName,
           storedName: serverStoredName,
           fileSize: processed.size,
           originalSize: processed.originalSize || "",

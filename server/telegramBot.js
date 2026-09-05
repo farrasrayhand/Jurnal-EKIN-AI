@@ -1980,14 +1980,24 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       const bestPhoto = photos[photos.length - 1];
       let savedFilePath = "";
 
+      const now = new Date();
+      const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      const monthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
+
       try {
-        savedFilePath = await bot.downloadFile(bestPhoto.file_id, UPLOADS_DIR);
+        const rawDl = await bot.downloadFile(bestPhoto.file_id, UPLOADS_DIR);
+        if (rawDl && fs.existsSync(rawDl)) {
+          const newPhotoName = `Foto_${monthTag}_${Date.now()}_${crypto.randomBytes(3).toString("hex")}.jpg`;
+          const newPath = path.join(UPLOADS_DIR, newPhotoName);
+          fs.renameSync(rawDl, newPath);
+          savedFilePath = newPath;
+        }
       } catch (dlErr) {
         console.warn("Gagal mengunduh berkas foto fisik:", dlErr.message);
       }
 
       const baseAppUrl = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
-      const photoFileName = savedFilePath ? path.basename(savedFilePath) : `foto_${Date.now()}.jpg`;
+      const photoFileName = savedFilePath ? path.basename(savedFilePath) : `Foto_${monthTag}_${Date.now()}.jpg`;
       const photoFileUrl = savedFilePath ? (baseAppUrl ? `${baseAppUrl}/uploads/${photoFileName}` : `/uploads/${photoFileName}`) : "";
       const ext = path.extname(photoFileName).toLowerCase() || ".jpg";
 
@@ -2021,27 +2031,41 @@ async function handleIncomingAttachment(botInstance, msg, item) {
 
     try {
       const doc = msg.document;
+      const now = new Date();
+      const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      const monthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
+
       const rawFileName = doc.file_name || "dokumen_kinerja.pdf";
       const cleanFileName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80) || "dokumen_kinerja.pdf";
+      const docFileName = cleanFileName.toLowerCase().includes(INDO_MONTHS[now.getMonth()].toLowerCase())
+        ? cleanFileName
+        : `${monthTag}_${cleanFileName}`;
+
       const fileSize = doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : "";
       let savedFilePath = "";
 
       try {
-        savedFilePath = await bot.downloadFile(doc.file_id, UPLOADS_DIR);
+        const rawDl = await bot.downloadFile(doc.file_id, UPLOADS_DIR);
+        if (rawDl && fs.existsSync(rawDl)) {
+          const newStoredName = `${Date.now()}_${docFileName}`;
+          const newPath = path.join(UPLOADS_DIR, newStoredName);
+          fs.renameSync(rawDl, newPath);
+          savedFilePath = newPath;
+        }
       } catch (dlErr) {
         console.warn("Gagal mengunduh berkas dokumen:", dlErr.message);
       }
 
       const baseAppUrl = (process.env.APP_URL || "").trim().replace(/\/+$/, "");
-      const storedFileName = savedFilePath ? path.basename(savedFilePath) : cleanFileName;
+      const storedFileName = savedFilePath ? path.basename(savedFilePath) : docFileName;
       const docFileUrl = savedFilePath ? (baseAppUrl ? `${baseAppUrl}/uploads/${storedFileName}` : `/uploads/${storedFileName}`) : "";
-      const ext = path.extname(cleanFileName).toLowerCase() || ".pdf";
+      const ext = path.extname(docFileName).toLowerCase() || ".pdf";
       const isImg = [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext);
 
       const item = {
         type: isImg ? "image" : "document",
         filePath: savedFilePath,
-        fileName: cleanFileName,
+        fileName: docFileName,
         fileUrl: docFileUrl,
         fileSize,
         ext

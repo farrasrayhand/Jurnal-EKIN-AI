@@ -282,14 +282,41 @@ function apiSyncPlugin() {
         req.on('data', chunk => (body += chunk))
         req.on('end', () => {
           try {
-            const { fileName, fileData } = JSON.parse(body)
+            const { fileName, fileData, tanggal, date } = JSON.parse(body)
             if (!fileData) {
               res.statusCode = 400
               res.setHeader('Content-Type', 'application/json')
               return res.end(JSON.stringify({ success: false, error: 'File data required' }))
             }
+
+            const tanggalReq = tanggal || date || ""
+            const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+            let monthName = ""
+            let yearNum = ""
+
+            if (tanggalReq && typeof tanggalReq === "string") {
+              const parts = tanggalReq.split("-")
+              if (parts.length >= 2) {
+                yearNum = parts[0]
+                const mIdx = parseInt(parts[1], 10) - 1
+                if (mIdx >= 0 && mIdx < 12) {
+                  monthName = INDO_MONTHS[mIdx]
+                }
+              }
+            }
+            if (!monthName || !yearNum) {
+              const now = new Date()
+              monthName = INDO_MONTHS[now.getMonth()]
+              yearNum = String(now.getFullYear())
+            }
+
+            const monthTag = `${monthName}_${yearNum}`
             const cleanName = path.basename(fileName || 'dokumen.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
-            const storedName = `${Date.now()}_${cleanName}`
+            const baseNameWithMonth = cleanName.toLowerCase().includes(monthName.toLowerCase())
+              ? cleanName
+              : `${monthTag}_${cleanName}`
+
+            const storedName = `${Date.now()}_${baseNameWithMonth}`
             const target = path.join(UPLOADS_DIR, storedName)
             const b64 = fileData.replace(/^data:[^;]+;base64,/, '')
             const buf = Buffer.from(b64, 'base64')
@@ -299,7 +326,7 @@ function apiSyncPlugin() {
               success: true,
               fileUrl: `/uploads/${storedName}`,
               relativeUrl: `/uploads/${storedName}`,
-              fileName: cleanName,
+              fileName: baseNameWithMonth,
               storedName: storedName,
               fileSize: `${(buf.length / 1024).toFixed(0)} KB`
             }))

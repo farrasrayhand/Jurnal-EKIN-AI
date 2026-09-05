@@ -92,7 +92,7 @@ export default function MonthlyReportGenerator({
           .replace(/_+/g, "_")
           .replace(/^_|_$/g, "");
         const ext = j.fotoUrl ? ".jpg" : (j.fileName ? (j.fileName.match(/\.[a-zA-Z0-9]+$/)?.[0] || ".pdf") : ".pdf");
-        trackableName = `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+        trackableName = `lampiran-${lampiranIndex}_${monthObj.name}_${selectedYear}_${cleanDate}_${safeTitle}${ext}`;
       }
       return {
         ...j,
@@ -145,8 +145,55 @@ export default function MonthlyReportGenerator({
     setTimeout(() => setCopiedNarasi(false), 2500);
   };
 
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  // Handler Download PDF Langsung dari Server API
+  const handleDownloadPdfDirect = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const query = new URLSearchParams({
+        month: selectedMonth,
+        year: selectedYear,
+        userId: pegawai?.id || "",
+        gdriveLink: gdriveLink || ""
+      });
+
+      const res = await fetch(`/api/reports/pdf?${query.toString()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const monthName = currentMonthData.monthObj.name;
+        const cleanName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
+        const filename = `Laporan_Kinerja_${monthName}_${selectedYear}_${cleanName}.pdf`;
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        confetti({ particleCount: 30, spread: 50 });
+        return;
+      }
+      // Fallback ke window print jika API server tidak merespons
+      handlePrint();
+    } catch (e) {
+      handlePrint();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
   const handlePrint = () => {
+    const origTitle = document.title;
+    const monthName = currentMonthData.monthObj.name;
+    const cleanName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
+    document.title = `Laporan_Kinerja_${monthName}_${selectedYear}_${cleanName}`;
     window.print();
+    setTimeout(() => {
+      document.title = origTitle;
+    }, 1200);
   };
 
   // Handler Download Paket Arsip ZIP (Laporan PDF + Seluruh Berkas Lampiran Terunggah)
@@ -164,7 +211,7 @@ export default function MonthlyReportGenerator({
       if (res.ok) {
         const blob = await res.blob();
         const disposition = res.headers.get("Content-Disposition") || "";
-        let filename = `Paket_Laporan_${currentMonthData.monthObj.name}_${selectedYear}.zip`;
+        let filename = `Paket_Laporan_Kinerja_${currentMonthData.monthObj.name}_${selectedYear}.zip`;
         const match = disposition.match(/filename="?([^";]+)"?/);
         if (match && match[1]) filename = match[1];
 
@@ -200,16 +247,18 @@ export default function MonthlyReportGenerator({
       const attachments = [];
       for (const jrn of currentMonthData.filteredJournals) {
         if (!jrn.hasPhysical) continue;
-        const lampiranFileName = jrn.trackableName || `lampiran-${jrn.lampiranIndex}.jpg`;
+        const lampiranFileName = jrn.trackableName || `lampiran-${jrn.lampiranIndex}_${monthName}_${selectedYear}.jpg`;
 
         if (jrn.fotoUrl && jrn.fotoUrl.startsWith("data:")) {
           const b64 = jrn.fotoUrl.replace(/^data:[^;]+;base64,/, "");
+          zip.file(`lampiran_${monthName}_${selectedYear}/${lampiranFileName}`, b64, { base64: true });
           zip.file(`lampiran/${lampiranFileName}`, b64, { base64: true });
         } else if (jrn.fileUrl || jrn.fotoUrl) {
           try {
             const fRes = await fetch(jrn.fileUrl || jrn.fotoUrl);
             if (fRes.ok) {
               const bBlob = await fRes.blob();
+              zip.file(`lampiran_${monthName}_${selectedYear}/${lampiranFileName}`, bBlob);
               zip.file(`lampiran/${lampiranFileName}`, bBlob);
             }
           } catch (e) {}
@@ -335,6 +384,35 @@ export default function MonthlyReportGenerator({
 
             <button
               type="button"
+              className="btn btn-secondary"
+              onClick={handleDownloadPdfDirect}
+              disabled={isDownloadingPdf}
+              style={{
+                background: "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
+                color: "#ffffff",
+                border: "none",
+                padding: "0.5rem 1.1rem",
+                fontWeight: "700",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                boxShadow: "0 2px 8px rgba(59, 130, 246, 0.25)",
+                cursor: isDownloadingPdf ? "not-allowed" : "pointer"
+              }}
+              title="Unduh berkas PDF Laporan Bulanan Resmi langsung dari server"
+            >
+              {isDownloadingPdf ? (
+                <span>⏳ Mengunduh PDF...</span>
+              ) : (
+                <>
+                  <FileText size={16} />
+                  <span>Unduh PDF Langsung</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
               className="btn btn-primary"
               onClick={handlePrint}
               style={{
@@ -349,7 +427,7 @@ export default function MonthlyReportGenerator({
               }}
             >
               <Printer size={16} />
-              <span>Cetak / Simpan PDF (A4)</span>
+              <span>Cetak / Dialog PDF (A4)</span>
             </button>
           </div>
         </div>

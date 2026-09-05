@@ -796,9 +796,38 @@ const server = http.createServer((req, res) => {
           return;
         }
 
+        // Tentukan keterangan bulan & tahun dari tanggal jurnal atau waktu sekarang
+        const tanggalReq = payload.tanggal || payload.date || "";
+        const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        let monthName = "";
+        let yearNum = "";
+
+        if (tanggalReq && typeof tanggalReq === "string") {
+          const parts = tanggalReq.split("-");
+          if (parts.length >= 2) {
+            yearNum = parts[0];
+            const mIdx = parseInt(parts[1], 10) - 1;
+            if (mIdx >= 0 && mIdx < 12) {
+              monthName = INDO_MONTHS[mIdx];
+            }
+          }
+        }
+        if (!monthName || !yearNum) {
+          const now = new Date();
+          monthName = INDO_MONTHS[now.getMonth()];
+          yearNum = String(now.getFullYear());
+        }
+
+        const monthTag = `${monthName}_${yearNum}`;
         const cleanBaseName = path.basename(rawFileName).replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
+        
+        // Pastikan nama berkas menyertakan keterangan bulan agar tidak tereplace dengan berkas bulan lain
+        const baseNameWithMonth = cleanBaseName.toLowerCase().includes(monthName.toLowerCase())
+          ? cleanBaseName
+          : `${monthTag}_${cleanBaseName}`;
+
         const randomPrefix = `${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
-        const storedFileName = `${randomPrefix}_${cleanBaseName}`;
+        const storedFileName = `${randomPrefix}_${baseNameWithMonth}`;
         const targetPath = path.join(UPLOADS_DIR, storedFileName);
 
         const base64Clean = fileData.replace(/^data:[^;]+;base64,/, "");
@@ -816,7 +845,7 @@ const server = http.createServer((req, res) => {
           success: true,
           fileUrl: fullUrl,
           relativeUrl: relativeUrl,
-          fileName: cleanBaseName,
+          fileName: baseNameWithMonth,
           storedName: storedFileName,
           fileSize: `${(fileBuffer.length / 1024).toFixed(0)} KB`
         }));

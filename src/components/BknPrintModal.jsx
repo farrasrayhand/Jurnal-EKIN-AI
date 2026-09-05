@@ -21,6 +21,10 @@ export default function BknPrintModal({
   const utamaList = rhkList.filter(r => r.jenis === "UTAMA");
   const tambahanList = rhkList.filter(r => r.jenis === "TAMBAHAN");
 
+  const cleanName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
+  const periodeText = typeof periode === "object" ? (periode.mulai || "2026").replace(/[^a-zA-Z0-9]/g, "_") : "2026";
+  const printDocTitle = `Dokumen_SKP_${periodeText}_${cleanName}`;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div 
@@ -36,7 +40,7 @@ export default function BknPrintModal({
             </p>
           </div>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button className="btn btn-primary btn-sm" onClick={triggerPrint}>
+            <button className="btn btn-primary btn-sm" onClick={() => triggerPrint(printDocTitle)}>
               <Printer size={15} /> Cetak / Simpan PDF
             </button>
             <button className="btn btn-secondary btn-icon btn-sm" onClick={onClose}>
@@ -403,7 +407,7 @@ export default function BknPrintModal({
           <button className="btn btn-secondary" onClick={onClose}>
             Tutup
           </button>
-          <button className="btn btn-primary" onClick={triggerPrint}>
+          <button className="btn btn-primary" onClick={() => triggerPrint(printDocTitle)}>
             <Printer size={16} /> Cetak / Unduh Dokumen PDF
           </button>
         </div>

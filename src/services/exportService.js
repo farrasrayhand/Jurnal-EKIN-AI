@@ -123,28 +123,63 @@ export function exportToExcel(pegawai, penilai, periode, rhkList, berakhlakList,
 
   XLSX.utils.book_append_sheet(wb, wsBerakhlak, "Perilaku Kerja BerAKHLAK");
 
-  // Unduh file excel
-  const fileName = `SKP_${(pegawai.nama || "ASN").replace(/\s+/g, "_")}_PermenPANRB_6_2022.xlsx`;
+  // Ekstraksi keterangan bulan dan periode agar file tidak saling menimpa
+  const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const now = new Date();
+  const currentMonthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
+
+  let periodeLabel = "";
+  if (periode && typeof periode === "object") {
+    const pMulai = (periode.mulai || "").trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const pSelesai = (periode.selesai || "").trim().replace(/[^a-zA-Z0-9]/g, "_");
+    if (pMulai && pSelesai) {
+      periodeLabel = `Periode_${pMulai}_sd_${pSelesai}_`;
+    } else if (pMulai) {
+      periodeLabel = `Periode_${pMulai}_`;
+    }
+  } else if (typeof periode === "string" && periode.trim()) {
+    periodeLabel = `Periode_${periode.trim().replace(/[^a-zA-Z0-9]/g, "_")}_`;
+  }
+
+  if (!periodeLabel) {
+    periodeLabel = `${currentMonthTag}_`;
+  }
+
+  // Unduh file excel dengan keterangan periode bulan/tahun
+  const fileName = `Laporan_SKP_${periodeLabel}${(pegawai.nama || "ASN").replace(/\s+/g, "_")}_PermenPANRB_6_2022.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
 
 /**
- * Ekspor data state lengkap ke JSON (Fitur Backup)
+ * Ekspor data state lengkap ke JSON (Fitur Backup) dengan label Bulan & Tahun
  */
 export function exportToJson(data) {
+  const now = new Date();
+  const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const monthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
+
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
   const downloadAnchor = document.createElement("a");
   downloadAnchor.setAttribute("href", dataStr);
   const name = (data.pegawai?.nama || "SKP_Data").replace(/\s+/g, "_");
-  downloadAnchor.setAttribute("download", `Backup_${name}_${new Date().toISOString().slice(0, 10)}.json`);
+  downloadAnchor.setAttribute("download", `Backup_Logbook_${monthTag}_${name}_${now.toISOString().slice(0, 10)}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
 }
 
 /**
- * Buka window cetak
+ * Buka window cetak dengan nama dokumen memuat keterangan periode/bulan
  */
-export function triggerPrint() {
+export function triggerPrint(customDocTitle) {
+  const origTitle = document.title;
+  if (customDocTitle) {
+    document.title = customDocTitle;
+  }
   window.print();
+  if (customDocTitle) {
+    setTimeout(() => {
+      document.title = origTitle;
+    }, 1200);
+  }
 }

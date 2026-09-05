@@ -480,8 +480,8 @@ export async function generateMonthlyReportZip({
         .replace(/[^a-z0-9]/g, "_");
 
       const trackableFileName = isMulti
-        ? `lampiran-${lampiranIndex}.${subNum}_${cleanDate}_${safeTitle}_${safeAttName}${ext}`
-        : `lampiran-${lampiranIndex}_${cleanDate}_${safeTitle}${ext}`;
+        ? `lampiran-${lampiranIndex}.${subNum}_${monthName}_${year}_${cleanDate}_${safeTitle}_${safeAttName}${ext}`
+        : `lampiran-${lampiranIndex}_${monthName}_${year}_${cleanDate}_${safeTitle}${ext}`;
 
       const labelNumber = isMulti ? `${lampiranIndex}.${subNum}` : `${lampiranIndex}`;
 
@@ -493,6 +493,7 @@ export async function generateMonthlyReportZip({
       }
 
       if (fileBuffer) {
+        zip.file(`lampiran_${monthName}_${year}/${trackableFileName}`, fileBuffer);
         zip.file(`lampiran/${trackableFileName}`, fileBuffer);
         daftarLampiranEntries.push({
           no: labelNumber,
