@@ -54,37 +54,47 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
 }
 `;
 
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": effectiveKey
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            responseMimeType: "application/json"
-          }
-        })
-      });
+      const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"];
+      for (const model of candidateModels) {
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": effectiveKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: "application/json"
+              }
+            })
+          });
 
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (content) {
-          const parsed = JSON.parse(content);
-          return {
-            aktivitas: cleanDuplicatePhrases(parsed.aktivitas || rawText),
-            outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
-            catatan: parsed.catatan || "Terselesaikan dengan tertib sesuai standar operasional prosedur.",
-            source: "gemini-ai"
-          };
+          if (response.ok) {
+            const data = await response.json();
+            const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (content) {
+              const parsed = JSON.parse(content);
+              return {
+                aktivitas: cleanDuplicatePhrases(parsed.aktivitas || rawText),
+                outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
+                catatan: parsed.catatan || "Terselesaikan dengan tertib sesuai standar operasional prosedur.",
+                source: `gemini-ai (${model})`
+              };
+            }
+          } else if (response.status === 429) {
+            console.warn(`[Gemini API] Model ${model} terkena limit 429 (kuota rate limit), mencoba model cadangan...`);
+          } else {
+            console.warn(`[Gemini API] Model ${model} respon status ${response.status}, mencoba model cadangan...`);
+          }
+        } catch (mErr) {
+          console.warn(`[Gemini API] Gagal memanggil ${model}:`, mErr.message);
         }
-      } else {
-        console.warn(`[Gemini API] Respon status ${response.status}, beralih ke engine heuristik offline.`);
       }
+      console.warn("[Gemini API] Seluruh model Gemini online sedang limit/penuh, beralih ke engine heuristik offline.");
     } catch (e) {
       console.warn("[Gemini API Error, beralih ke offline]:", e.message);
     }
