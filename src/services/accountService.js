@@ -116,10 +116,10 @@ export function saveAccount(accountData) {
   return accounts;
 }
 
-// Hapus Akun
-export function deleteAccount(id) {
+// Hapus Akun Pengguna (Cascade Delete: Database, Jurnal Terkait, Berkas Fisik di Server & Sesi)
+export async function deleteAccount(id) {
   const accounts = getAccounts();
-  const target = accounts.find(a => a.id === id);
+  const target = accounts.find(a => a.id === id || a.username === id);
   if (!target) return accounts;
 
   // Larang menghapus superadmin terakhir
@@ -130,9 +130,40 @@ export function deleteAccount(id) {
     }
   }
 
-  const filtered = accounts.filter(a => a.id !== id);
+  // Panggil endpoint backend untuk menghapus akun, seluruh jurnal, file fisik eviden, dan sesi
+  try {
+    const res = await fetch("/api/accounts/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: target.id })
+    });
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      if (errJson.message) {
+        throw new Error(errJson.message);
+      }
+    }
+  } catch (apiErr) {
+    console.warn("Peringatan API hapus akun server:", apiErr.message);
+    if (apiErr.message.includes("superadmin")) {
+      throw apiErr;
+    }
+  }
+
+  // Bersihkan juga seluruh jurnal milik pengguna dari LocalStorage browser
+  try {
+    const localJournals = JSON.parse(localStorage.getItem("ekinerja_journals") || "[]");
+    const targetIdClean = String(target.id || "").toLowerCase();
+    const targetUserClean = String(target.username || "").toLowerCase();
+    const remainingJournals = localJournals.filter(j => {
+      const jU = String(j.userId || "").toLowerCase();
+      return jU !== targetIdClean && jU !== targetUserClean && (!j.userId ? targetUserClean !== "farras" : true);
+    });
+    localStorage.setItem("ekinerja_journals", JSON.stringify(remainingJournals));
+  } catch (e) {}
+
+  const filtered = accounts.filter(a => a.id !== target.id);
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(filtered));
-  pushSyncToBackend({ accounts: filtered });
   return filtered;
 }
 

@@ -711,6 +711,9 @@ export function addAttachmentToJournal(journalId, attachment) {
 /**
  * Menghapus file fisik eviden/lampiran terkait jurnal dari folder uploads
  */
+/**
+ * Menghapus file fisik eviden/lampiran terkait jurnal dari folder uploads
+ */
 export function removeJournalAttachmentFiles(journalsList) {
   if (!Array.isArray(journalsList) || journalsList.length === 0) return 0;
   const UPLOADS_DIR = path.resolve(__dirname, "../database/uploads");
@@ -722,36 +725,85 @@ export function removeJournalAttachmentFiles(journalsList) {
     if (jrn.filePath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(jrn.filePath)));
     if (jrn.fotoPath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(jrn.fotoPath)));
     if (jrn.fileName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(jrn.fileName)));
-    if (jrn.fotoUrl && typeof jrn.fotoUrl === "string" && jrn.fotoUrl.includes("/uploads/")) {
-      const bName = path.basename(jrn.fotoUrl);
-      candidates.push(path.resolve(UPLOADS_DIR, bName));
+    if (jrn.storedName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(jrn.storedName)));
+    if (jrn.fotoUrl && typeof jrn.fotoUrl === "string") {
+      const cleanUrl = jrn.fotoUrl.split("?")[0].split("#")[0];
+      const bName = path.basename(cleanUrl);
+      if (bName) candidates.push(path.resolve(UPLOADS_DIR, bName));
     }
-    if (jrn.fileUrl && typeof jrn.fileUrl === "string" && jrn.fileUrl.includes("/uploads/")) {
-      const bName = path.basename(jrn.fileUrl);
-      candidates.push(path.resolve(UPLOADS_DIR, bName));
+    if (jrn.fileUrl && typeof jrn.fileUrl === "string") {
+      const cleanUrl = jrn.fileUrl.split("?")[0].split("#")[0];
+      const bName = path.basename(cleanUrl);
+      if (bName) candidates.push(path.resolve(UPLOADS_DIR, bName));
     }
 
-    // Periksa juga seluruh attachments
+    // Periksa juga seluruh attachments multi-file
     if (Array.isArray(jrn.attachments)) {
       for (const att of jrn.attachments) {
+        if (!att) continue;
         if (att.filePath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.filePath)));
+        if (att.fotoPath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.fotoPath)));
         if (att.fileName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.fileName)));
-        if (att.fileUrl && typeof att.fileUrl === "string" && att.fileUrl.includes("/uploads/")) {
-          candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.fileUrl)));
+        if (att.storedName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(att.storedName)));
+        if (att.fileUrl && typeof att.fileUrl === "string") {
+          const cleanUrl = att.fileUrl.split("?")[0].split("#")[0];
+          const bName = path.basename(cleanUrl);
+          if (bName) candidates.push(path.resolve(UPLOADS_DIR, bName));
+        }
+        if (att.fotoUrl && typeof att.fotoUrl === "string") {
+          const cleanUrl = att.fotoUrl.split("?")[0].split("#")[0];
+          const bName = path.basename(cleanUrl);
+          if (bName) candidates.push(path.resolve(UPLOADS_DIR, bName));
         }
       }
     }
 
-    for (const fPath of candidates) {
+    const uniqueCandidates = Array.from(new Set(candidates.filter(Boolean)));
+    for (const fPath of uniqueCandidates) {
       try {
         if (fPath.startsWith(UPLOADS_DIR) && fs.existsSync(fPath)) {
-          fs.unlinkSync(fPath);
-          deletedFiles++;
+          const stat = fs.statSync(fPath);
+          if (stat.isFile()) {
+            fs.unlinkSync(fPath);
+            deletedFiles++;
+          }
         }
       } catch (e) {}
     }
   }
   return deletedFiles;
+}
+
+/**
+ * Menghapus satu kegiatan jurnal berdasarkan ID (dan membersihkan berkas fisiknya dari disk)
+ */
+export function deleteJournalById(journalId, deletePhysicalFiles = true) {
+  if (!journalId) {
+    return { success: false, message: "ID kegiatan jurnal wajib disertakan." };
+  }
+
+  const store = getStore();
+  const cleanId = String(journalId).trim();
+  const targetJournal = (store.journals || []).find(j => String(j.id).trim() === cleanId);
+
+  if (!targetJournal) {
+    return { success: false, message: `Kegiatan jurnal dengan ID "${journalId}" tidak ditemukan.` };
+  }
+
+  let deletedFiles = 0;
+  if (deletePhysicalFiles) {
+    deletedFiles = removeJournalAttachmentFiles([targetJournal]);
+  }
+
+  store.journals = (store.journals || []).filter(j => String(j.id).trim() !== cleanId);
+  saveStore(store);
+
+  return {
+    success: true,
+    deletedId: cleanId,
+    deletedFiles,
+    remainingCount: store.journals.length
+  };
 }
 
 /**
@@ -824,6 +876,71 @@ export function deleteJournalsByUserId(userIdOrUsername, deletePhysicalFiles = t
     deletedCount: toDelete.length,
     deletedFiles,
     remainingCount: toKeep.length
+  };
+}
+
+/**
+ * Menghapus akun pengguna (User) secara tuntas:
+ * 1. Menghapus semua kegiatan jurnal milik pengguna
+ * 2. Menghapus semua berkas fisik foto & dokumen milik pengguna dari folder uploads
+ * 3. Menghapus semua sesi login web & telegram milik pengguna
+ * 4. Menghapus akun dari daftar accounts
+ */
+export function deleteUserById(userIdOrUsername, deletePhysicalFiles = true) {
+  if (!userIdOrUsername) {
+    return { success: false, message: "ID atau Username pengguna wajib disertakan." };
+  }
+
+  const store = getStore();
+  const user = findUserById(userIdOrUsername) || findUserByUsername(userIdOrUsername);
+
+  if (!user) {
+    return { success: false, message: "Akun pengguna tidak ditemukan di database." };
+  }
+
+  // Lindungi Superadmin Terakhir
+  if (user.role === "superadmin") {
+    const superadmins = (store.accounts || []).filter(a => a.role === "superadmin");
+    if (superadmins.length <= 1) {
+      return { 
+        success: false, 
+        message: "Tidak dapat menghapus superadmin terakhir! Sistem wajib memiliki minimal satu superadmin." 
+      };
+    }
+  }
+
+  // 1 & 2. Hapus seluruh jurnal milik pengguna dan bersihkan seluruh berkas fisiknya dari disk
+  const journalRes = deleteJournalsByUserId(user.id, deletePhysicalFiles);
+
+  // 3. Bersihkan sesi Telegram pengguna
+  if (store.telegramSessions && typeof store.telegramSessions === "object") {
+    for (const [chatId, uid] of Object.entries(store.telegramSessions)) {
+      if (uid === user.id || String(uid).toLowerCase() === user.username.toLowerCase()) {
+        delete store.telegramSessions[chatId];
+      }
+    }
+  }
+
+  // 4. Bersihkan sesi Web pengguna
+  if (store.webSessions && typeof store.webSessions === "object") {
+    for (const [token, sess] of Object.entries(store.webSessions)) {
+      if (sess && (sess.userId === user.id || String(sess.userId).toLowerCase() === user.username.toLowerCase())) {
+        delete store.webSessions[token];
+      }
+    }
+  }
+
+  // 5. Hapus akun dari accounts
+  store.accounts = (store.accounts || []).filter(a => a.id !== user.id && a.username.toLowerCase() !== user.username.toLowerCase());
+
+  saveStore(store);
+
+  return {
+    success: true,
+    user: sanitizeUser(user),
+    deletedJournals: journalRes.deletedCount,
+    deletedFiles: journalRes.deletedFiles,
+    remainingAccounts: store.accounts.length
   };
 }
 

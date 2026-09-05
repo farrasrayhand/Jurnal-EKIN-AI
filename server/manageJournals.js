@@ -26,6 +26,8 @@ import {
   getAccounts, 
   deleteAllJournals, 
   deleteJournalsByUserId, 
+  deleteJournalById,
+  deleteUserById,
   findUserByUsername, 
   findUserById 
 } from "./dbStore.js";
@@ -55,16 +57,17 @@ function printHelp() {
   printHeader();
   console.log(`
 Panduan Penggunaan Perintah CLI:
-  npm run clear-journals                    Buka Menu Interaktif
-  npm run clear-journals -- --list          Tampilkan daftar pengguna & jumlah jurnal
-  npm run clear-journals -- --all           Hapus SEMUA data jurnal di sistem
-  npm run clear-journals -- --all -y        Hapus SEMUA jurnal tanpa konfirmasi
-  npm run clear-journals -- --user farras   Hapus jurnal milik akun 'farras'
-  npm run clear-journals -- --user farras -y Hapus jurnal milik 'farras' langsung
+  npm run clear-journals                             Buka Menu Interaktif
+  npm run clear-journals -- --list                   Tampilkan daftar pengguna & jumlah jurnal
+  npm run clear-journals -- --all                    Hapus SEMUA data jurnal di sistem
+  npm run clear-journals -- --all -y                 Hapus SEMUA jurnal tanpa konfirmasi
+  npm run clear-journals -- --user <username>        Hapus jurnal milik akun tertentu
+  npm run clear-journals -- --delete-user <username> Hapus AKUN pengguna beserta seluruh jurnal & filenya
+  npm run clear-journals -- --delete-journal <id>    Hapus 1 jurnal tertentu beserta berkas fisiknya
 
 Parameter Tambahan:
   --no-files   Mempertahankan berkas fisik eviden di folder uploads
-  -y, --yes    Melewati konfirmasi konfirmasi (cocok untuk skrip otomatis)
+  -y, --yes    Melewati konfirmasi (cocok untuk skrip otomatis)
   -h, --help   Tampilkan panduan ini
 `);
 }
@@ -213,6 +216,82 @@ async function handleActionUser(targetUsernameOrId, autoConfirm = false, deleteF
   }
 }
 
+async function handleActionDeleteUser(targetUsernameOrId, autoConfirm = false, deleteFiles = true) {
+  let target = targetUsernameOrId;
+  const { stats } = getUserStats();
+
+  if (!target) {
+    displayStats();
+    target = await promptInput("Masukkan Username atau ID Pengguna yang ingin DIHAPUS AKUNNYA: ");
+  }
+
+  if (!target) {
+    console.log("❌ Tindakan dibatalkan: Username / ID tidak boleh kosong.");
+    return;
+  }
+
+  const found = stats.find(s => 
+    s.username.toLowerCase() === target.toLowerCase() || 
+    s.id.toLowerCase() === target.toLowerCase()
+  );
+
+  const displayName = found ? `${found.nama || found.username} (@${found.username})` : target;
+
+  if (!autoConfirm) {
+    console.log(`\n⚠️  PERINGATAN: Anda akan MENGHAPUS AKUN "${displayName}"!`);
+    console.log(`   - Seluruh data kegiatan jurnal akun ini akan dihapus.`);
+    if (deleteFiles) {
+      console.log(`   - Seluruh berkas fisik (foto & dokumen eviden) di server akan dihapus.`);
+    }
+    console.log(`   - Seluruh sesi login Web & Telegram akun ini akan dicabut.`);
+
+    const confirm = await promptInput(`Ketik 'HAPUS' untuk mengonfirmasi: `);
+    if (confirm !== "HAPUS") {
+      console.log("❌ Tindakan dibatalkan. Tidak ada akun yang dihapus.");
+      return;
+    }
+  }
+
+  const result = deleteUserById(target, deleteFiles);
+  if (result.success) {
+    console.log(`\n✅ BERHASIL: Akun "${displayName}" telah dihapus secara tuntas.`);
+    console.log(`🗑️  ${result.deletedJournals} jurnal dan ${result.deletedFiles} berkas fisik telah dibersihkan.`);
+    console.log(`👥 Jumlah akun yang tersisa: ${result.remainingAccounts} akun.`);
+  } else {
+    console.log(`❌ Gagal: ${result.message}`);
+  }
+}
+
+async function handleActionSingleJournal(targetJournalId, autoConfirm = false, deleteFiles = true) {
+  let targetId = targetJournalId;
+  if (!targetId) {
+    targetId = await promptInput("Masukkan ID Kegiatan Jurnal yang ingin dihapus (contoh: jrn-123456): ");
+  }
+
+  if (!targetId) {
+    console.log("❌ ID Jurnal tidak boleh kosong.");
+    return;
+  }
+
+  if (!autoConfirm) {
+    const confirm = await promptInput(`Ketik 'Y' untuk menghapus kegiatan jurnal "${targetId}": `);
+    if (!["y", "ya"].includes(confirm.toLowerCase())) {
+      console.log("❌ Tindakan dibatalkan.");
+      return;
+    }
+  }
+
+  const result = deleteJournalById(targetId, deleteFiles);
+  if (result.success) {
+    console.log(`\n✅ BERHASIL: Kegiatan jurnal "${targetId}" telah dihapus.`);
+    if (result.deletedFiles > 0) {
+      console.log(`🗑️  ${result.deletedFiles} berkas fisik lampiran/eviden terkait berhasil dihapus.`);
+    }
+  } else {
+    console.log(`❌ Gagal: ${result.message}`);
+  }
+}
+
 async function runInteractiveMenu() {
   printHeader();
 
@@ -222,22 +301,28 @@ async function runInteractiveMenu() {
     console.log(`Pilihan Aksi Pembersihan:`);
     console.log(`  [1] Hapus SEMUA data jurnal di dalam sistem`);
     console.log(`  [2] Hapus data jurnal untuk PENGGUNA TERTENTU`);
-    console.log(`  [3] Refresh Tampilan Statistik`);
+    console.log(`  [3] Hapus AKUN PENGGUNA (User + Jurnal + File Fisik + Sesi)`);
+    console.log(`  [4] Hapus 1 JURNAL TERTENTU (berdasarkan ID)`);
+    console.log(`  [5] Refresh Tampilan Statistik`);
     console.log(`  [0] Keluar / Selesai\n`);
 
-    const choice = await promptInput("Pilih menu [0-3]: ");
+    const choice = await promptInput("Pilih menu [0-5]: ");
 
     if (choice === "1") {
       await handleActionAll(false, true);
     } else if (choice === "2") {
       await handleActionUser(null, false, true);
     } else if (choice === "3") {
+      await handleActionDeleteUser(null, false, true);
+    } else if (choice === "4") {
+      await handleActionSingleJournal(null, false, true);
+    } else if (choice === "5") {
       console.log("Memperbarui data...");
     } else if (choice === "0" || choice.toLowerCase() === "exit" || choice.toLowerCase() === "q") {
       console.log("Sampai jumpa!");
       break;
     } else {
-      console.log("⚠️ Pilihan tidak valid, silakan masukkan angka 0 sampai 3.");
+      console.log("⚠️ Pilihan tidak valid, silakan masukkan angka 0 sampai 5.");
     }
 
     console.log("\nTekan Enter untuk kembali ke menu...");
@@ -270,6 +355,32 @@ async function main() {
   if (args.includes("--all")) {
     printHeader();
     await handleActionAll(isAutoConfirm, isDeleteFiles);
+    return;
+  }
+
+  // Opsi --delete-user <username>
+  const delUserIdx = args.findIndex(a => a === "--delete-user" || a === "--del-user");
+  if (delUserIdx !== -1) {
+    const target = args[delUserIdx + 1];
+    if (!target || target.startsWith("-")) {
+      console.error("❌ Kesalahan: Harap tentukan username/ID setelah opsi --delete-user. Contoh: --delete-user budi");
+      process.exit(1);
+    }
+    printHeader();
+    await handleActionDeleteUser(target, isAutoConfirm, isDeleteFiles);
+    return;
+  }
+
+  // Opsi --delete-journal <id>
+  const delJrnIdx = args.findIndex(a => a === "--delete-journal" || a === "--del-jrn");
+  if (delJrnIdx !== -1) {
+    const target = args[delJrnIdx + 1];
+    if (!target || target.startsWith("-")) {
+      console.error("❌ Kesalahan: Harap tentukan ID jurnal setelah opsi --delete-journal. Contoh: --delete-journal jrn-123");
+      process.exit(1);
+    }
+    printHeader();
+    await handleActionSingleJournal(target, isAutoConfirm, isDeleteFiles);
     return;
   }
 

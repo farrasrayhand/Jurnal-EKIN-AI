@@ -50,6 +50,8 @@ const MIME_TYPES = {
 };
 
 import { 
+  getStore,
+  saveStore,
   authenticateUser, 
   sanitizeUser, 
   hashPassword,
@@ -61,6 +63,8 @@ import {
   getWebSession,
   deleteWebSession,
   cleanupExpiredSessions,
+  deleteJournalById,
+  deleteUserById,
   ONE_DAY_MS
 } from "./dbStore.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
@@ -410,6 +414,158 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Endpoint Hapus Kegiatan Jurnal (Hapus Database + Hapus Berkas Fisik di Disk)
+  // --------------------------------------------------------------------------
+  if (pathname === "/api/journals/delete" || (req.method === "DELETE" && pathname.startsWith("/api/journals/"))) {
+    if (req.method !== "POST" && req.method !== "DELETE") {
+      res.statusCode = 405;
+      res.end("Method Not Allowed");
+      return;
+    }
+
+    const handleJournalDeletion = (targetId) => {
+      if (!targetId) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: false, message: "ID kegiatan jurnal wajib disertakan!" }));
+        return;
+      }
+      const result = deleteJournalById(targetId, true);
+      if (!result.success) {
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(result));
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(result));
+    };
+
+    if (req.method === "DELETE" && pathname.startsWith("/api/journals/")) {
+      const idFromPath = pathname.slice("/api/journals/".length).trim();
+      handleJournalDeletion(idFromPath);
+      return;
+    }
+
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 50000) req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        handleJournalDeletion(payload.id);
+      } catch (e) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: false, message: "Payload JSON tidak valid." }));
+      }
+    });
+    return;
+  }
+
+  // --------------------------------------------------------------------------
+  // Endpoint Hapus Akun Pengguna (Hapus Akun + Seluruh Jurnal + Berkas Fisik + Sesi)
+  // --------------------------------------------------------------------------
+  if (pathname === "/api/accounts/delete" || (req.method === "DELETE" && pathname.startsWith("/api/accounts/"))) {
+    if (req.method !== "POST" && req.method !== "DELETE") {
+      res.statusCode = 405;
+      res.end("Method Not Allowed");
+      return;
+    }
+
+    const handleAccountDeletion = (targetId) => {
+      if (!targetId) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: false, message: "ID atau Username pengguna wajib disertakan!" }));
+        return;
+      }
+      const result = deleteUserById(targetId, true);
+      if (!result.success) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(result));
+        return;
+      }
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify(result));
+    };
+
+    if (req.method === "DELETE" && pathname.startsWith("/api/accounts/")) {
+      const idFromPath = pathname.slice("/api/accounts/".length).trim();
+      handleAccountDeletion(idFromPath);
+      return;
+    }
+
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 50000) req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        const payload = JSON.parse(body);
+        handleAccountDeletion(payload.id || payload.userId || payload.username);
+      } catch (e) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: false, message: "Payload JSON tidak valid." }));
+      }
+    });
+    return;
+  }
+
+  // --------------------------------------------------------------------------
+  // Endpoint Hapus File Fisik Sementara (Saat Pembatalan Draft Upload)
+  // --------------------------------------------------------------------------
+  if (req.method === "POST" && pathname === "/api/uploads/delete") {
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 50000) req.destroy();
+    });
+    req.on("end", () => {
+      try {
+        const { fileUrl, filePath, fileName, storedName } = JSON.parse(body);
+        const candidates = [];
+        if (filePath) candidates.push(path.resolve(UPLOADS_DIR, path.basename(filePath)));
+        if (storedName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(storedName)));
+        if (fileName) candidates.push(path.resolve(UPLOADS_DIR, path.basename(fileName)));
+        if (fileUrl && typeof fileUrl === "string") {
+          const cleanUrl = fileUrl.split("?")[0].split("#")[0];
+          const bName = path.basename(cleanUrl);
+          if (bName) candidates.push(path.resolve(UPLOADS_DIR, bName));
+        }
+
+        let deleted = false;
+        for (const fPath of Array.from(new Set(candidates.filter(Boolean)))) {
+          try {
+            if (fPath.startsWith(UPLOADS_DIR) && fs.existsSync(fPath)) {
+              const stat = fs.statSync(fPath);
+              if (stat.isFile()) {
+                fs.unlinkSync(fPath);
+                deleted = true;
+              }
+            }
+          } catch (e) {}
+        }
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: true, deleted }));
+      } catch (e) {
+        res.statusCode = 400;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ success: false, error: "Bad request" }));
+      }
+    });
+    return;
+  }
+
   // Handler Status Konfigurasi Bot Telegram
   if (pathname === "/api/bot-status") {
     res.setHeader("Content-Type", "application/json");
@@ -429,20 +585,14 @@ const server = http.createServer((req, res) => {
 
     if (req.method === "GET") {
       res.setHeader("Content-Type", "application/json");
-      let payload = { accounts: [], journals: [] };
-      if (fs.existsSync(DB_FILE)) {
-        try {
-          payload = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-        } catch (e) {}
-      }
-
-      // 🛡️ KEAMANAN: JANGAN PERNAH BOCORKAN HASH PASSWORD KE BROWSER!
-      if (Array.isArray(payload.accounts)) {
-        payload.accounts = payload.accounts.map(sanitizeUser);
-      }
-
-      payload.botConfig = getBotConfig();
-      res.end(JSON.stringify(payload));
+      const store = getStore();
+      const accounts = (store.accounts || []).map(sanitizeUser);
+      const journals = store.journals || [];
+      res.end(JSON.stringify({
+        accounts,
+        journals,
+        botConfig: getBotConfig()
+      }));
       return;
     } else if (req.method === "POST") {
       // Proteksi Ukuran Payload: Maksimal 10MB
@@ -463,20 +613,10 @@ const server = http.createServer((req, res) => {
         if (isTooLarge) return;
         try {
           const incoming = JSON.parse(body);
-          let current = {};
-          if (fs.existsSync(DB_FILE)) {
-            try {
-              current = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-            } catch (e) {}
-          }
-          const merged = {
-            ...current,
-            ...incoming,
-            updatedAt: new Date().toISOString()
-          };
+          const store = getStore();
 
           if (Array.isArray(incoming.accounts)) {
-            const map = new Map((current.accounts || []).map(a => [a.id || a.username, a]));
+            const map = new Map((store.accounts || []).map(a => [a.id || a.username, a]));
             incoming.accounts.forEach(a => {
               const existing = map.get(a.id || a.username);
               let passwordToStore = existing?.password || "";
@@ -490,20 +630,18 @@ const server = http.createServer((req, res) => {
                 password: passwordToStore
               });
             });
-            merged.accounts = Array.from(map.values());
+            store.accounts = Array.from(map.values());
           }
           if (Array.isArray(incoming.journals)) {
-            const jMap = new Map((current.journals || []).map(j => [j.id, j]));
+            const jMap = new Map((store.journals || []).map(j => [j.id, j]));
             incoming.journals.forEach(j => jMap.set(j.id, { ...jMap.get(j.id), ...j }));
-            merged.journals = Array.from(jMap.values());
+            store.journals = Array.from(jMap.values());
           }
 
-          const dbDir = path.dirname(DB_FILE);
-          if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
-          fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), "utf8");
+          saveStore(store);
 
           res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ success: true, count: merged.accounts?.length }));
+          res.end(JSON.stringify({ success: true, count: store.accounts?.length }));
         } catch (err) {
           res.statusCode = 500;
           res.setHeader("Content-Type", "application/json");

@@ -67,6 +67,7 @@ export default function JournalSection({
 
         // Upload ke backend /api/upload agar memiliki URL link langsung di aplikasi
         let serverFileUrl = "";
+        let serverStoredName = "";
         try {
           const uploadRes = await fetch("/api/upload", {
             method: "POST",
@@ -81,6 +82,9 @@ export default function JournalSection({
             if (upJson?.fileUrl) {
               serverFileUrl = upJson.fileUrl;
             }
+            if (upJson?.storedName) {
+              serverStoredName = upJson.storedName;
+            }
           }
         } catch (netErr) {
           // Mode offline/standalone, gunakan dataUrl lokal
@@ -92,6 +96,7 @@ export default function JournalSection({
           type: isImg ? "image" : "document",
           docCategory: isImg ? "image" : processed.type,
           fileName: processed.name,
+          storedName: serverStoredName,
           fileSize: processed.size,
           fotoUrl: processed.dataUrl,
           fileUrl: serverFileUrl,
@@ -108,6 +113,7 @@ export default function JournalSection({
           evidenceType: first ? first.type : "none",
           docCategory: first ? first.docCategory : "pdf",
           fileName: first ? first.fileName : "",
+          storedName: first ? first.storedName : "",
           fileSize: first ? first.fileSize : "",
           fotoUrl: first ? first.fotoUrl : "",
           fileUrl: first ? first.fileUrl : "",
@@ -124,6 +130,20 @@ export default function JournalSection({
 
   const handleRemoveAttachment = (attId) => {
     setFormData(prev => {
+      const targetAtt = (prev.attachments || []).find(a => a.id === attId);
+      if (targetAtt && (targetAtt.fileUrl || targetAtt.filePath || targetAtt.storedName)) {
+        fetch("/api/uploads/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileUrl: targetAtt.fileUrl,
+            filePath: targetAtt.filePath,
+            fileName: targetAtt.fileName,
+            storedName: targetAtt.storedName
+          })
+        }).catch(() => {});
+      }
+
       const remaining = (prev.attachments || []).filter(a => a.id !== attId);
       const first = remaining[0];
       return {
@@ -132,6 +152,7 @@ export default function JournalSection({
         evidenceType: first ? first.type : "none",
         docCategory: first ? first.docCategory : "pdf",
         fileName: first ? first.fileName : "",
+        storedName: first ? first.storedName : "",
         fileSize: first ? first.fileSize : "",
         fotoUrl: first ? first.fotoUrl : "",
         fileUrl: first ? first.fileUrl : ""
@@ -140,12 +161,30 @@ export default function JournalSection({
   };
 
   const handleRemoveFile = () => {
+    // Bersihkan file server dari seluruh attachments draft yang dibatalkan
+    if (Array.isArray(formData.attachments)) {
+      for (const att of formData.attachments) {
+        if (att && (att.fileUrl || att.filePath || att.storedName)) {
+          fetch("/api/uploads/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileUrl: att.fileUrl,
+              filePath: att.filePath,
+              fileName: att.fileName,
+              storedName: att.storedName
+            })
+          }).catch(() => {});
+        }
+      }
+    }
     setFormData(prev => ({
       ...prev,
       attachments: [],
       evidenceType: "none",
       docCategory: "pdf",
       fileName: "",
+      storedName: "",
       fileSize: "",
       fotoUrl: "",
       fileUrl: ""
@@ -159,9 +198,14 @@ export default function JournalSection({
       return;
     }
 
+    const activeUserId = currentUser?.id || (currentUser?.username ? `usr-${currentUser.username}` : "usr-farras");
+    const activeUsername = currentUser?.username || "farras";
+
     const newEntry = {
       ...formData,
       id: `jrn-${Date.now()}`,
+      userId: activeUserId,
+      username: activeUsername,
       aktivitasKasaran: originalKasaran || formData.aktivitas
     };
 
@@ -174,11 +218,14 @@ export default function JournalSection({
       outputJumlah: "1 Dokumen / Kegiatan",
       rhkId: rhkList[0]?.id || "",
       catatan: "",
+      attachments: [],
       evidenceType: "none",
       docCategory: "pdf",
       fileName: "",
+      storedName: "",
       fileSize: "",
       fotoUrl: "",
+      fileUrl: "",
       linkUrl: ""
     });
     setIsFormOpen(false);
@@ -232,9 +279,20 @@ export default function JournalSection({
     }
   };
 
-  const handleDeleteJournal = (id) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus catatan aktivitas ini?")) {
-      setJournals(journals.filter(j => j.id !== id));
+  const handleDeleteJournal = async (id) => {
+    if (window.confirm("Apakah Anda yakin ingin menghapus catatan aktivitas ini?\n\nSemua file bukti fisik (foto/dokumen) yang tersimpan di server untuk aktivitas ini juga akan ikut dihapus permanen agar tidak meninggalkan file sampah.")) {
+      try {
+        await fetch("/api/journals/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id })
+        });
+      } catch (err) {
+        console.warn("Peringatan saat menghapus jurnal di backend:", err.message);
+      }
+      setJournals(prev => prev.filter(j => j.id !== id));
+      setNotification("Catatan aktivitas dan seluruh berkas fisik lampiran terkait berhasil dihapus bersih.");
+      setTimeout(() => setNotification(""), 3500);
     }
   };
 

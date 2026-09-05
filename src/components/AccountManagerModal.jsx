@@ -478,17 +478,20 @@ export default function AccountManagerModal({
     }
   };
 
-  const handleDeleteAccount = (acc) => {
+  const handleDeleteAccount = async (acc) => {
     if (acc.id === currentUser?.id) {
       alert("Anda sedang login menggunakan akun ini! Tidak dapat menghapus akun yang sedang aktif.");
       return;
     }
 
-    if (window.confirm(`Hapus akun "${acc.nama} (${acc.username})"? Tindakan ini tidak dapat dibatalkan.`)) {
+    if (window.confirm(`Hapus akun "${acc.nama} (${acc.username})"?\n\nSeluruh data kegiatan jurnal, bukti berkas dokumen/foto di server, dan sesi login milik pengguna ini akan ikut dihapus tuntas secara permanen agar tidak meninggalkan sampah. Lanjutkan?`)) {
       try {
-        deleteAccount(acc.id);
+        await deleteAccount(acc.id);
         reloadAccounts();
-        setNotification({ type: "success", text: `Akun ${acc.username} berhasil dihapus.` });
+        setNotification({ 
+          type: "success", 
+          text: `Akun ${acc.username} beserta seluruh jurnal dan berkas fisiknya berhasil dibersihkan tuntas.` 
+        });
       } catch (err) {
         alert(err.message);
       }
