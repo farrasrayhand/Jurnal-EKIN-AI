@@ -620,6 +620,8 @@ const server = http.createServer(async (req, res) => {
           apiKey: cleanApiKey
         });
 
+        console.log(`✨ [API /api/ai/polish] Selesai memoles jurnal. Sumber: ${result.source || "offline"}`);
+
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
         res.end(JSON.stringify(result));

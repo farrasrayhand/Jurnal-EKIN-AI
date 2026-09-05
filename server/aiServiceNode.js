@@ -78,6 +78,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
             const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (content) {
               const parsed = JSON.parse(content);
+              console.log(`🚀 [Gemini API] Sukses memoles jurnal dengan model: ${model}`);
               return {
                 aktivitas: cleanDuplicatePhrases(parsed.aktivitas || rawText),
                 outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
@@ -110,6 +111,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
   }
 
   // 2. Engine Heuristik Offline (Cerdas, Cepat, Tanpa API Key)
+  console.log("ℹ️ [AI Engine] Memoles jurnal dengan Mode Heuristik Offline ASN.");
   return polishJournalOfflineNode(rawText);
 }
 
