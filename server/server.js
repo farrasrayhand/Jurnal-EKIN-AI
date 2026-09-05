@@ -69,7 +69,7 @@ import {
   ONE_DAY_MS
 } from "./dbStore.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
-import { initMysqlDatabase, loadStoreFromMysql, getMysqlConfig, getDatabaseHealth } from "./mysqlAdapter.js";
+import { initDatabase, loadStoreFromDatabase, getDatabaseHealth, getActiveDbType } from "./dbAdapter.js";
 
 // Rate Limiter Sederhana In-Memory untuk Cegah Brute-Force & DoS
 const rateLimitMap = new Map();
@@ -1022,26 +1022,27 @@ const server = http.createServer((req, res) => {
 });
 
 async function startServer() {
-  const mysqlConfig = getMysqlConfig();
   let dbStatus = "Penyimpanan Berkas JSON Lokal (database/ekinerja_store.json)";
+  const activeType = getActiveDbType();
 
-  if (mysqlConfig) {
+  if (activeType !== "json") {
     try {
-      const mysqlInit = await initMysqlDatabase();
-      if (mysqlInit.enabled) {
-        dbStatus = `MySQL / MariaDB (${mysqlConfig.database} @ ${mysqlConfig.host}:${mysqlConfig.port}) - Aktif & Seeder Terpasang`;
-        const mysqlStore = await loadStoreFromMysql();
-        if (mysqlStore) {
-          setCachedStore(mysqlStore);
+      const dbInit = await initDatabase();
+      if (dbInit.enabled) {
+        const typeLabel = activeType === "postgres" ? "PostgreSQL" : "MySQL / MariaDB";
+        dbStatus = `${typeLabel} - Aktif & Terhubung (${dbInit.accountCount || 0} akun)`;
+        const remoteStore = await loadStoreFromDatabase();
+        if (remoteStore) {
+          setCachedStore(remoteStore);
           try {
-            fs.writeFileSync(DB_FILE, JSON.stringify(mysqlStore, null, 2), "utf8");
+            fs.writeFileSync(DB_FILE, JSON.stringify(remoteStore, null, 2), "utf8");
           } catch (e) {}
         }
       } else {
-        dbStatus = `MySQL Fallback (${mysqlInit.error || "offline"}), aktif di JSON lokal`;
+        dbStatus = `${activeType.toUpperCase()} Fallback (${dbInit.error || dbInit.reason || "offline"}), aktif di JSON lokal`;
       }
     } catch (e) {
-      dbStatus = `MySQL Gagal (${e.message}), aktif di JSON lokal`;
+      dbStatus = `${activeType.toUpperCase()} Gagal (${e.message}), aktif di JSON lokal`;
     }
   }
 

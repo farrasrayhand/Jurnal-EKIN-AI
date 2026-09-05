@@ -299,9 +299,9 @@ export function saveStore(store) {
     lastReadMtime = fs.statSync(DB_FILE).mtimeMs;
   } catch (e) {}
 
-  // Sinkronkan ke database MySQL jika dikonfigurasi (background async)
-  import("./mysqlAdapter.js")
-    .then(m => m.syncStoreToMysql(store))
+  // Sinkronkan ke database MySQL / PostgreSQL jika dikonfigurasi (background async)
+  import("./dbAdapter.js")
+    .then(m => m.syncStoreToDatabase(store))
     .catch(() => {});
 
   return store;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Script Seeder Database E-Kinerja AI untuk MySQL / MariaDB & JSON Store
+ * Script Seeder Database E-Kinerja AI untuk MySQL, PostgreSQL, & JSON Store
  * Cara pakai:
  *   npm run seed
  *   node server/seedDatabase.js
@@ -29,20 +29,23 @@ import {
   saveStore,
   getStore
 } from "./dbStore.js";
-import { getMysqlConfig, getPool, initMysqlDatabase } from "./mysqlAdapter.js";
+import { getActiveDbType } from "./dbAdapter.js";
+import { getMysqlConfig, getPool as getMysqlPool, initMysqlDatabase } from "./mysqlAdapter.js";
+import { getPostgresConfig, getPool as getPostgresPool, initPostgresDatabase } from "./postgresAdapter.js";
 
 async function main() {
   const isForce = process.argv.includes("--force");
+  const activeType = getActiveDbType();
+
   console.log("========================================================================");
   console.log("🌱 [SEEDER E-KINERJA AI] MEMULAI PROSES SEED DATABASE");
   console.log("========================================================================");
 
-  const mysqlConfig = getMysqlConfig();
-
-  if (mysqlConfig) {
+  if (activeType === "mysql") {
+    const mysqlConfig = getMysqlConfig();
     console.log(`🔌 Target Database : MySQL / MariaDB (${mysqlConfig.database} @ ${mysqlConfig.host}:${mysqlConfig.port})`);
     try {
-      const pool = getPool();
+      const pool = getMysqlPool();
       const conn = await pool.getConnection();
 
       try {
@@ -114,7 +117,7 @@ async function main() {
               jrn.fotoUrl || "",
               jrn.fileUrl || "",
               JSON.stringify(jrn.attachments || []),
-              new Date().toISOString(),
+              jrn.createdAt || new Date().toISOString(),
               new Date().toISOString()
             ]);
           }
@@ -139,6 +142,113 @@ async function main() {
       }
     } catch (e) {
       console.error("❌ Gagal seeding MySQL:", e.message);
+    }
+  } else if (activeType === "postgres") {
+    const pgConfig = getPostgresConfig();
+    console.log(`🔌 Target Database : PostgreSQL (${pgConfig.database} @ ${pgConfig.host}:${pgConfig.port})`);
+    try {
+      const pool = getPostgresPool();
+      const client = await pool.connect();
+
+      try {
+        await initPostgresDatabase();
+
+        if (isForce) {
+          console.log("⚠️ Mode --force aktif: Membersihkan tabel PostgreSQL sebelum seeding...");
+          await client.query("DELETE FROM accounts");
+          await client.query("DELETE FROM journals");
+          await client.query("DELETE FROM registration_codes");
+          await client.query("DELETE FROM web_sessions");
+          await client.query("DELETE FROM telegram_sessions");
+          await client.query("DELETE FROM system_settings");
+        }
+
+        const existing = await client.query("SELECT COUNT(*) AS cnt FROM accounts");
+        const count = parseInt(existing.rows[0]?.cnt || "0", 10);
+        if (count > 0 && !isForce) {
+          console.log(`ℹ️ Tabel accounts sudah berisi ${count} akun. Gunakan '--force' jika ingin menimpa.`);
+        } else {
+          for (const acc of DEFAULT_SEED_ACCOUNTS) {
+            const safePwd = hashPassword(acc.password);
+            await client.query(`
+              INSERT INTO accounts (id, username, password, role, nama, nip, pangkat, jabatan, unit_kerja, allow_env_key, personal_api_key, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+              ON CONFLICT (id) DO UPDATE SET
+                password = EXCLUDED.password,
+                role = EXCLUDED.role,
+                nama = EXCLUDED.nama
+            `, [
+              acc.id,
+              acc.username,
+              safePwd,
+              acc.role || "pegawai",
+              acc.nama,
+              acc.nip || "",
+              acc.pangkat || "",
+              acc.jabatan || "",
+              acc.unitKerja || "",
+              acc.allowEnvKey !== false,
+              acc.personalApiKey || null,
+              acc.createdAt || new Date().toISOString(),
+              new Date().toISOString()
+            ]);
+            console.log(`   + Akun: @${acc.username} (${acc.role}) - ${acc.nama}`);
+          }
+
+          for (const jrn of DEFAULT_SEED_JOURNALS) {
+            await client.query(`
+              INSERT INTO journals (id, user_id, tanggal, jam, aktivitas, aktivitas_kasaran, output_jumlah, catatan, link_url, evidence_type, doc_category, file_name, stored_name, file_size, original_size, foto_url, file_url, attachments, created_at, updated_at)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+              ON CONFLICT (id) DO UPDATE SET
+                aktivitas = EXCLUDED.aktivitas
+            `, [
+              jrn.id,
+              jrn.userId,
+              jrn.tanggal,
+              jrn.jam || "",
+              jrn.aktivitas,
+              jrn.aktivitasKasaran || "",
+              jrn.outputJumlah || "",
+              jrn.catatan || "",
+              jrn.linkUrl || "",
+              jrn.evidenceType || "none",
+              jrn.docCategory || "pdf",
+              jrn.fileName || "",
+              jrn.storedName || "",
+              jrn.fileSize || "",
+              jrn.originalSize || "",
+              jrn.fotoUrl || "",
+              jrn.fileUrl || "",
+              JSON.stringify(jrn.attachments || []),
+              jrn.createdAt || new Date().toISOString(),
+              new Date().toISOString()
+            ]);
+          }
+
+          await client.query(`
+            INSERT INTO system_settings (setting_key, setting_val, updated_at)
+            VALUES ('penilai', $1, $2)
+            ON CONFLICT (setting_key) DO UPDATE SET
+              setting_val = EXCLUDED.setting_val,
+              updated_at = EXCLUDED.updated_at
+          `, [JSON.stringify(DEFAULT_PENILAI), new Date().toISOString()]);
+
+          await client.query(`
+            INSERT INTO system_settings (setting_key, setting_val, updated_at)
+            VALUES ('settings', $1, $2)
+            ON CONFLICT (setting_key) DO UPDATE SET
+              setting_val = EXCLUDED.setting_val,
+              updated_at = EXCLUDED.updated_at
+          `, [JSON.stringify({ gdriveLink: "" }), new Date().toISOString()]);
+
+          console.log("✅ Seeding PostgreSQL Selesai dengan Sukses!");
+        }
+      } finally {
+        client.release();
+        await pool.end();
+      }
+    } catch (e) {
+      console.error("❌ Gagal seeding PostgreSQL:", e.message);
     }
   } else {
     console.log("📁 Target Database : JSON Store Lokal (database/ekinerja_store.json)");
