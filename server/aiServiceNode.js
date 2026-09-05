@@ -41,8 +41,9 @@ Catatan Kasaran Pegawai:
 Pedoman Substansi & Relevansi Tugas:
 1. Pertahankan substansi dan konteks pekerjaan riil yang ditulis pegawai! JANGAN mengubah jenis kegiatan yang tidak relevan.
 2. Contoh: Jika pegawai menulis tentang "arsip", "ijazah alumni", "berkas", "lemari dokumen", itu adalah TUGAS KEARSIPAN & TATA USAHA (gunakan: "Melakukan penataan, klasifikasi, serta penyimpanan berkas arsip..."). DILARANG KERAS mengubahnya menjadi kegiatan pembelajaran/mengajar murid hanya karena ada kata "tahun ajaran" atau "alumni"!
-3. Jika pegawai menulis tentang persuratan ("surat masuk", "disposisi"), itu adalah TUGAS TATA NASKAH DINAS & PERSURATAN.
+3. Jika pegawai menulis tentang persuratan ("surat masuk", "disposisi", "registrasi surat"), itu adalah TUGAS TATA NASKAH DINAS & PERSURATAN (gunakan: "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi..."). Perhatikan: jika surat masuk tersebut perihalnya tentang bimtek/sosialisasi/kurikulum, tugas pegawai adalah MENGELOLA / MEREGISTRASI SURATNYA, BUKAN mengikuti sosialisasi/bimtek!
 4. Jika pegawai menulis tentang "rekap berkas usul kenaikan pangkat", itu adalah TUGAS ADMINISTRASI KEPEGAWAIAN.
+5. STANDAR TATA BAHASA & SINGKATAN RESMI: DILARANG menggunakan singkatan tidak baku seperti "ttg", "no", "dgn", "yg", "utk", "dlm". Wajib ubah menjadi kata formal baku (misalnya: "ttg" menjadi "tentang", "no" menjadi "Nomor", "bimtek" menjadi "Bimbingan Teknis (Bimtek)", "dinas pendidikan" menjadi "Dinas Pendidikan").
 
 Instruksi Output:
 Kembalikan HANYA format JSON valid tanpa format markdown lain:
@@ -133,6 +134,57 @@ export function cleanDuplicatePhrases(str) {
 }
 
 /**
+ * Normalisasi Singkatan Informal menjadi Bahasa Indonesia Baku ASN
+ */
+export function normalizeAbbreviations(text) {
+  if (!text || typeof text !== "string") return "";
+  let s = text;
+
+  // 1. Singkatan umum naskah dinas & dokumen
+  s = s.replace(/\bttg\b\.?/gi, "tentang");
+  s = s.replace(/\bno\.?\s*(\d+)/gi, "Nomor $1");
+  s = s.replace(/\bno\b\.?/gi, "Nomor");
+  s = s.replace(/\bsurat no\b\.?/gi, "surat Nomor");
+  s = s.replace(/\b(thn|th)\b\.?\s*(\d{4})/gi, "Tahun $2");
+  s = s.replace(/\b(thn|th)\b\.?/gi, "tahun");
+  s = s.replace(/\btgl\b\.?/gi, "tanggal");
+  s = s.replace(/\bbln\b\.?/gi, "bulan");
+  s = s.replace(/\blamp\b\.?/gi, "lampiran");
+  s = s.replace(/\bhal\b\.?/gi, "perihal");
+
+  // 2. Singkatan kedinasan / teknis
+  s = s.replace(/\bbimtek\b/gi, "Bimbingan Teknis (Bimtek)");
+  s = s.replace(/\bdinas pendidikan\b/gi, "Dinas Pendidikan");
+  s = s.replace(/\bkemenag\b/gi, "Kementerian Agama");
+  s = s.replace(/\bkemenkeu\b/gi, "Kementerian Keuangan");
+  s = s.replace(/\bbkn\b/gi, "Badan Kepegawaian Negara (BKN)");
+  s = s.replace(/\bkkg\b/gi, "Kelompok Kerja Guru (KKG)");
+  s = s.replace(/\bmgmp\b/gi, "Musyawarah Guru Mata Pelajaran (MGMP)");
+  s = s.replace(/\bkurikulum merdeka\b/gi, "Kurikulum Merdeka");
+  s = s.replace(/\bkurikulum\b/gi, "Kurikulum");
+
+  // 3. Singkatan percakapan sehari-hari
+  s = s.replace(/\byg\b/gi, "yang");
+  s = s.replace(/\bdgn\b/gi, "dengan");
+  s = s.replace(/\butk\b/gi, "untuk");
+  s = s.replace(/\bdlm\b/gi, "dalam");
+  s = s.replace(/\bsdh|udh\b/gi, "sudah");
+  s = s.replace(/\bblm\b/gi, "belum");
+  s = s.replace(/\btdk|gak|nggak\b/gi, "tidak");
+  s = s.replace(/\bsbg\b/gi, "sebagai");
+  s = s.replace(/\bdsb|dll\b/gi, "dan sebagainya");
+  s = s.replace(/\bjg\b/gi, "juga");
+  s = s.replace(/\bpd\b/gi, "pada");
+  s = s.replace(/\bdr\b/gi, "dari");
+  s = s.replace(/\bhrs\b/gi, "harus");
+  s = s.replace(/\bmsh\b/gi, "masih");
+
+  // Rapikan spasi berlebih
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+/**
  * Engine Heuristik Offline Pemoles Catatan Kasar ASN
  */
 export function polishJournalOfflineNode(rawText) {
@@ -188,17 +240,20 @@ export function polishJournalOfflineNode(rawText) {
     text = strippedText;
   }
 
+  // Normalisasi singkatan informal agar menjadi istilah resmi dan baku
+  text = normalizeAbbreviations(text);
+
   // Deteksi Kategori Kegiatan secara Kontekstual & Akurat (Berdasarkan Word Boundaries)
   const isExplicitTeaching = /\b(mengajar|ngajar|kbm|jam pelajaran|pembelajaran di kelas|kegiatan belajar mengajar)\b/i.test(text);
 
-  const isSosialisasi = detectedCategory === "sosialisasi" ||
-    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi)\b/i.test(text);
+  // Persuratan harus diprioritaskan: jika ada "surat masuk" / "registrasi surat", itu tugas persuratan, BUKAN sosialisasi meskipun ada topik bimtek di dalam suratnya
+  const isPersuratan = /\b(surat masuk|surat keluar|buku agenda|disposisi|lembar disposisi|ekspedisi surat|surat dinas|surat edaran|penomoran surat|registrasi surat|input registrasi)\b/i.test(text) || detectedCategory === "persuratan";
+
+  const isSosialisasi = !isPersuratan && (detectedCategory === "sosialisasi" ||
+    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi)\b/i.test(text));
 
   const isKearsipan = detectedCategory === "kearsipan" ||
     /\b(arsip|kearsipan|mengarsipkan|pengarsipan|mengarsip|ijazah|buku induk|lemari dokumen|lemari arsip|penataan berkas|simpan berkas|penyimpanan berkas|filling|map arsip)\b/i.test(text);
-
-  const isPersuratan = detectedCategory === "persuratan" ||
-    /\b(surat masuk|surat keluar|buku agenda|disposisi|lembar disposisi|ekspedisi surat|surat dinas|surat edaran|penomoran surat)\b/i.test(text);
 
   const isRekap = detectedCategory === "rekap" ||
     /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data)\b/i.test(text);
@@ -234,6 +289,10 @@ export function polishJournalOfflineNode(rawText) {
     formalPrefix = "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi";
     output = "1 Jurnal Pembelajaran & Daftar Hadir";
     catatan = "Kegiatan belajar mengajar berlangsung interaktif dan seluruh capaian materi terpenuhi baik.";
+  } else if (isPersuratan) {
+    formalPrefix = "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi";
+    output = "1 Berkas Pengelolaan Surat Dinas";
+    catatan = "Surat kedinasan telah teragendakan dan didistribusikan secara tertib sesuai disposisi pimpinan.";
   } else if (isSosialisasi) {
     formalPrefix = "Mengikuti kegiatan sosialisasi, pendalaman materi kedinasan, serta pembahasan teknis";
     output = "1 Sertifikat / Surat Tugas / Laporan Kegiatan";
@@ -242,10 +301,6 @@ export function polishJournalOfflineNode(rawText) {
     formalPrefix = "Melakukan penataan, klasifikasi, serta penyimpanan";
     output = "1 Berkas Pengelolaan Arsip Dokumen";
     catatan = "Berkas dokumen telah diverifikasi, tersusun secara sistematis, dan disimpan aman pada lemari arsip sesuai klasifikasi.";
-  } else if (isPersuratan) {
-    formalPrefix = "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi";
-    output = "1 Berkas Pengelolaan Surat Dinas";
-    catatan = "Surat kedinasan telah teragendakan dan didistribusikan secara tertib sesuai disposisi pimpinan.";
   } else if (isPelayanan) {
     formalPrefix = "Melaksanakan pelayanan administrasi kedinasan, verifikasi kelengkapan berkas, serta pencatatan register";
     output = "1 Berkas Register Pelayanan Administrasi";
@@ -291,7 +346,10 @@ export function polishJournalOfflineNode(rawText) {
     .replace(/^(bikin|buat|membuat|susun|menyusun)\s+/gi, "")
     .replace(/^(ngecek|cek|memeriksa|pantau|memantau)\s+/gi, "")
     .replace(/^(ngajar|mengajar)\s+/gi, "")
+    .replace(/^(terkait)\s+/gi, "")
     .replace(/\b(terus|lalu|trs|trus|abis|setelah itu)\b/gi, "serta")
+    .replace(/\b(yang|yg)\s+rusak\b/gi, "yang mengalami kendala teknis")
+    .replace(/\b(yang|yg)\s+(mati|down|putus)\b/gi, "yang mengalami gangguan operasional")
     .replace(/\b(benerin|perbaiki|rusak)\b/gi, "penanganan kendala")
     .replace(/\b(bersihin|rawat)\b/gi, "pemeliharaan")
     .replace(/\b(bikin|buat)\b/gi, "penyusunan")
@@ -312,6 +370,9 @@ export function polishJournalOfflineNode(rawText) {
     if (isSosialisasi) {
       const topic = cleaned.replace(/^(sosialisasi|kegiatan sosialisasi|bimtek|workshop|pelatihan)\s*/gi, "").trim();
       polished = topic ? `${formalPrefix} terkait ${topic}` : formalPrefix;
+    } else if (isPersuratan) {
+      const topic = cleaned.replace(/^(surat dinas|pengelolaan surat dinas|pengelolaan surat)\s*/gi, "").trim();
+      polished = topic.toLowerCase().startsWith("terkait") ? `${formalPrefix} ${topic}` : `${formalPrefix} terkait ${topic}`;
     } else if (isKearsipan && !cleaned.toLowerCase().startsWith("dokumen") && !cleaned.toLowerCase().startsWith("berkas")) {
       polished = `${formalPrefix} dokumen ${cleaned}`;
     } else {
