@@ -16,6 +16,23 @@ const NAMA_BULAN = [
 ];
 
 /**
+ * Mendapatkan nama hari dalam bahasa Indonesia (Senin s/d Minggu)
+ */
+export function getHariIndonesia(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  try {
+    const clean = dateStr.trim().slice(0, 10);
+    const [y, m, d] = clean.split("-").map(Number);
+    if (!y || !m || !d) return "";
+    const dt = new Date(y, m - 1, d);
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    return days[dt.getDay()] || "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/**
  * Menemukan file fisik eviden dari sebuah entri jurnal jika diunggah ke sistem
  */
 function resolveSingleAttachmentItem(item, uploadsDir) {
@@ -283,7 +300,7 @@ export function generateMonthlyReportPdf({
           const textHeight = doc.heightOfString(fullUraian, { width: colW[2] - 10 });
           const hasPhoto = (jrn.allAtts || []).some(a => a.type === "photo");
           const hasDocFile = (jrn.allAtts || []).some(a => a.type !== "photo");
-          const minHeight = hasPhoto ? 58 : (hasDocFile ? 42 : 32);
+          const minHeight = hasPhoto ? 58 : (hasDocFile ? 46 : 38);
           const rowH = Math.max(minHeight, textHeight + 12);
 
           if (tableY + rowH > 750) {
@@ -305,12 +322,23 @@ export function generateMonthlyReportPdf({
           doc.fillColor("#000000").font("Times-Roman").fontSize(8.5);
           doc.text(String(idx + 1), tableLeft, tableY + 6, { width: colW[0], align: "center" });
 
+          const hariName = getHariIndonesia(jrn.tanggal);
           const dateStr = jrn.tanggal || "-";
-          doc.font("Times-Bold").fontSize(8);
-          doc.text(dateStr, tableLeft + colW[0] + 4, tableY + 6, { width: colW[1] - 8, align: "center" });
+
+          let curDateY = tableY + 5;
+          if (hariName) {
+            doc.font("Times-Bold").fontSize(8).fillColor("#000000");
+            doc.text(hariName, tableLeft + colW[0] + 3, curDateY, { width: colW[1] - 6, align: "center" });
+            curDateY = doc.y + 1;
+          }
+
+          doc.font(hariName ? "Times-Roman" : "Times-Bold").fontSize(7.5).fillColor("#000000");
+          doc.text(dateStr, tableLeft + colW[0] + 3, curDateY, { width: colW[1] - 6, align: "center" });
+          curDateY = doc.y + 2;
+
           if (jrn.jam) {
-            doc.font("Times-Roman").fontSize(7.5).fillColor("#475569");
-            doc.text(jrn.jam, tableLeft + colW[0] + 4, doc.y + 2, { width: colW[1] - 8, align: "center" });
+            doc.font("Times-Roman").fontSize(7).fillColor("#475569");
+            doc.text(jrn.jam, tableLeft + colW[0] + 3, curDateY, { width: colW[1] - 6, align: "center" });
           }
 
           doc.fillColor("#000000").font("Times-Roman").fontSize(8.5);

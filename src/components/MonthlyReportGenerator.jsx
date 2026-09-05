@@ -22,6 +22,23 @@ const MONTHS_LIST = [
   { id: "12", name: "Desember", year: "2026", range: "1 Desember s/d 31 Desember 2026" }
 ];
 
+/**
+ * Mendapatkan nama hari dalam bahasa Indonesia (Senin s/d Minggu)
+ */
+export function getHariIndonesia(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return "";
+  try {
+    const clean = dateStr.trim().slice(0, 10);
+    const [y, m, d] = clean.split("-").map(Number);
+    if (!y || !m || !d) return "";
+    const dt = new Date(y, m - 1, d);
+    const days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    return days[dt.getDay()] || "";
+  } catch (e) {
+    return "";
+  }
+}
+
 export default function MonthlyReportGenerator({
   pegawai,
   setPegawai,
@@ -678,9 +695,20 @@ export default function MonthlyReportGenerator({
                 {currentMonthData.filteredJournals.map((jrn, idx) => (
                   <tr key={jrn.id || idx}>
                     <td style={{ border: "1px solid #000000", padding: "5px", textAlign: "center", verticalAlign: "top" }}>{idx + 1}</td>
-                    <td style={{ border: "1px solid #000000", padding: "5px", verticalAlign: "top" }}>
-                      <strong>{jrn.tanggal}</strong>
-                      <div style={{ fontSize: "8pt", color: "#475569" }}>{jrn.jam || "Jam Kerja"}</div>
+                    <td style={{ border: "1px solid #000000", padding: "5px", verticalAlign: "top", textAlign: "center" }}>
+                      {getHariIndonesia(jrn.tanggal) && (
+                        <div style={{ fontWeight: "700", color: "#0f172a", fontSize: "8.5pt" }}>
+                          {getHariIndonesia(jrn.tanggal)}
+                        </div>
+                      )}
+                      <div style={{ fontWeight: getHariIndonesia(jrn.tanggal) ? "500" : "700", fontSize: "8pt", color: "#334155" }}>
+                        {jrn.tanggal}
+                      </div>
+                      {jrn.jam && (
+                        <div style={{ fontSize: "7.5pt", color: "#64748b", marginTop: "2px" }}>
+                          {jrn.jam}
+                        </div>
+                      )}
                     </td>
                     <td style={{ border: "1px solid #000000", padding: "5px", textAlign: "justify", verticalAlign: "top" }}>
                       {jrn.aktivitas}
