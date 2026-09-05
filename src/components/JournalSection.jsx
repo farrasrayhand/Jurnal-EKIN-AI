@@ -98,6 +98,7 @@ export default function JournalSection({
           fileName: processed.name,
           storedName: serverStoredName,
           fileSize: processed.size,
+          originalSize: processed.originalSize || "",
           fotoUrl: processed.dataUrl,
           fileUrl: serverFileUrl,
           linkUrl: serverFileUrl
@@ -115,6 +116,7 @@ export default function JournalSection({
           fileName: first ? first.fileName : "",
           storedName: first ? first.storedName : "",
           fileSize: first ? first.fileSize : "",
+          originalSize: first ? first.originalSize : "",
           fotoUrl: first ? first.fotoUrl : "",
           fileUrl: first ? first.fileUrl : "",
           linkUrl: prev.linkUrl || (first ? first.fileUrl : "")
@@ -712,7 +714,7 @@ export default function JournalSection({
                     {isUploading ? "Memproses Berkas..." : "Klik untuk Unggah Berkas (Bisa Pilih Banyak)"}
                   </p>
                   <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Foto (.jpg, .png) atau Berkas (.pdf, .docx, .xlsx, dll.)
+                    Foto (.jpg, .png) otomatis dikompresi ringan & tajam ala WhatsApp atau Berkas (.pdf, .docx, .xlsx, dll.)
                   </p>
                 </div>
               ) : (
@@ -751,7 +753,14 @@ export default function JournalSection({
                           {att.fileName}
                         </p>
                         <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                          {att.fileSize} • {att.type === "image" ? "Foto Dokumentasi" : "Dokumen Berkas"}
+                          {att.fileSize}
+                          {att.type === "image" && att.originalSize && att.originalSize !== att.fileSize && (
+                            <span style={{ color: "#10b981", fontWeight: "600", marginLeft: "4px" }}>
+                              (Hemat dari {att.originalSize})
+                            </span>
+                          )}
+                          {" • "}
+                          {att.type === "image" ? "Foto Terkompresi Cerdas" : "Dokumen Berkas"}
                         </span>
                       </div>
                       <button 

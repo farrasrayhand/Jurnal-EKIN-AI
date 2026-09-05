@@ -8,20 +8,28 @@ export function processEvidenceFile(file) {
     const fileType = getFileTypeCategory(file.name, file.type);
 
     if (isImage) {
-      // Kompresi gambar
+      // Kompresi gambar cerdas ala WhatsApp:
+      // 1. Batasi dimensi maksimal (sisi terpanjang max 1280px)
+      // 2. Pertahankan proporsi aspek rasio (baik landscape maupun portrait)
+      // 3. Konversi format ke JPEG kualitas 0.75 (sangat tajam untuk teks/wajah namun berukuran sangat hemat ~80-180 KB)
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = (event) => {
         const img = new Image();
         img.src = event.target.result;
         img.onload = () => {
-          const maxWidth = 800;
+          const maxDimension = 1280; // Standar kompresi optimal WhatsApp & dokumen ASN
           let width = img.width;
           let height = img.height;
 
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
           }
 
           const canvas = document.createElement("canvas");
@@ -29,14 +37,25 @@ export function processEvidenceFile(file) {
           canvas.height = height;
 
           const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
           ctx.drawImage(img, 0, 0, width, height);
 
+          // Kompresi ke JPEG dengan kualitas 0.75
           const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+
+          // Hitung ukuran nyata setelah kompresi
+          const head = "data:image/jpeg;base64,";
+          const compressedBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
+          const finalSizeFormatted = formatBytes(compressedBytes);
+
           resolve({
             category: "image",
             type: fileType,
-            name: fileName,
-            size: fileSizeFormatted,
+            name: fileName.replace(/\.[^/.]+$/, "") + ".jpg",
+            originalSize: fileSizeFormatted,
+            size: finalSizeFormatted,
+            compressed: true,
             dataUrl: compressedDataUrl
           });
         };
