@@ -180,7 +180,7 @@ export async function initPostgresDatabase() {
 
       // 7. SEEDER OTOMATIS: JALANKAN JIKA TABEL ACCOUNTS KOSONG
       const accRes = await client.query("SELECT COUNT(*) AS count FROM accounts");
-      const accountCount = parseInt(accRes.rows[0]?.count || "0", 10);
+      let accountCount = parseInt(accRes.rows[0]?.count || "0", 10);
 
       if (accountCount === 0) {
         console.log("🌱 [PostgreSQL Seeder] Database kosong terdeteksi! Memulai eksekusi seeder awal...");
@@ -285,12 +285,15 @@ export async function initPostgresDatabase() {
             updated_at = EXCLUDED.updated_at
         `, [JSON.stringify({ gdriveLink: "" }), new Date().toISOString()]);
 
+        const countAfter = await client.query("SELECT COUNT(*) AS count FROM accounts");
+        accountCount = parseInt(countAfter.rows[0]?.count || String(DEFAULT_SEED_ACCOUNTS.length), 10);
+
         console.log(`
 ========================================================================
 🎉 [PostgreSQL Seeder] SEEDER DATABASE POSTGRESQL SUKSES!
 ========================================================================
 📦 Database       : ${config.database} (${config.host}:${config.port})
-👥 Akun Dibuat    : 3 Akun Seeder Bawaan
+👥 Akun Dibuat    : ${accountCount} Akun Terdaftar
    - Superadmin   : Username "superadmin" (Role: superadmin)
    - Pegawai 1    : Username "farras" (Role: pegawai)
    - Pegawai 2    : Username "budi.santoso" (Role: pegawai)

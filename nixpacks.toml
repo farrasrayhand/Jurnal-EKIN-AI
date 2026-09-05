@@ -9,4 +9,4 @@ NODE_VERSION = "22"
 cmds = ["npm run build"]
 
 [start]
-cmd = "npm start"
+cmd = "node server/server.js"

@@ -1022,31 +1022,31 @@ const server = http.createServer((req, res) => {
 });
 
 async function startServer() {
-  let dbStatus = "Penyimpanan Berkas JSON Lokal (database/ekinerja_store.json)";
-  const activeType = getActiveDbType();
+  server.listen(PORT, HOST, async () => {
+    let dbStatus = "Penyimpanan Berkas JSON Lokal (database/ekinerja_store.json)";
+    const activeType = getActiveDbType();
 
-  if (activeType !== "json") {
-    try {
-      const dbInit = await initDatabase();
-      if (dbInit.enabled) {
-        const typeLabel = activeType === "postgres" ? "PostgreSQL" : "MySQL / MariaDB";
-        dbStatus = `${typeLabel} - Aktif & Terhubung (${dbInit.accountCount || 0} akun)`;
-        const remoteStore = await loadStoreFromDatabase();
-        if (remoteStore) {
-          setCachedStore(remoteStore);
-          try {
-            fs.writeFileSync(DB_FILE, JSON.stringify(remoteStore, null, 2), "utf8");
-          } catch (e) {}
+    if (activeType !== "json") {
+      try {
+        const dbInit = await initDatabase();
+        if (dbInit.enabled) {
+          const typeLabel = activeType === "postgres" ? "PostgreSQL" : "MySQL / MariaDB";
+          dbStatus = `${typeLabel} - Aktif & Terhubung (${dbInit.accountCount || 0} akun)`;
+          const remoteStore = await loadStoreFromDatabase();
+          if (remoteStore) {
+            setCachedStore(remoteStore);
+            try {
+              fs.writeFileSync(DB_FILE, JSON.stringify(remoteStore, null, 2), "utf8");
+            } catch (e) {}
+          }
+        } else {
+          dbStatus = `${activeType.toUpperCase()} Fallback (${dbInit.error || dbInit.reason || "offline"}), aktif di JSON lokal`;
         }
-      } else {
-        dbStatus = `${activeType.toUpperCase()} Fallback (${dbInit.error || dbInit.reason || "offline"}), aktif di JSON lokal`;
+      } catch (e) {
+        dbStatus = `${activeType.toUpperCase()} Gagal (${e.message}), aktif di JSON lokal`;
       }
-    } catch (e) {
-      dbStatus = `${activeType.toUpperCase()} Gagal (${e.message}), aktif di JSON lokal`;
     }
-  }
 
-  server.listen(PORT, HOST, () => {
     console.log(`
 ========================================================================
 🚀 [EASYPANEL / PRODUCTION SERVER] E-KINERJA AI AKTIF!

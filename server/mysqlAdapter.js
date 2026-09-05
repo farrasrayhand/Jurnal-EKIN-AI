@@ -177,8 +177,8 @@ export async function initMysqlDatabase() {
       // ======================================================================
       // 7. SEEDER OTOMATIS: JALANKAN JIKA TABEL ACCOUNTS KOSONG
       // ======================================================================
-      const [accRows] = await conn.query("SELECT COUNT(*) AS count FROM accounts");
-      const accountCount = accRows[0]?.count || 0;
+      let [accRows] = await conn.query("SELECT COUNT(*) AS count FROM accounts");
+      let accountCount = Number(accRows[0]?.count || 0);
 
       if (accountCount === 0) {
         console.log("🌱 [MySQL Seeder] Database kosong terdeteksi! Memulai eksekusi seeder awal...");
@@ -248,12 +248,15 @@ export async function initMysqlDatabase() {
           ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), updated_at = VALUES(updated_at)
         `, [JSON.stringify({ gdriveLink: "" }), new Date().toISOString()]);
 
+        [accRows] = await conn.query("SELECT COUNT(*) AS count FROM accounts");
+        accountCount = Number(accRows[0]?.count || DEFAULT_SEED_ACCOUNTS.length);
+
         console.log(`
 ========================================================================
 🎉 [MySQL Seeder] SEEDER DATABASE MYSQL SUKSES!
 ========================================================================
 📦 Database       : ${config.database} (${config.host}:${config.port})
-👥 Akun Dibuat    : 3 Akun Seeder Bawaan
+👥 Akun Dibuat    : ${accountCount} Akun Terdaftar
    - Superadmin   : Username "superadmin" (Role: superadmin)
    - Pegawai 1    : Username "farras" (Role: pegawai)
    - Pegawai 2    : Username "budi.santoso" (Role: pegawai)
