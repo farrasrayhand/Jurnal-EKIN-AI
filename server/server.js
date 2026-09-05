@@ -180,6 +180,25 @@ const server = http.createServer(async (req, res) => {
     };
   };
 
+  const getAiConfig = () => {
+    const rawKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "")
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .trim();
+    const hasServerKey = Boolean(
+      rawKey && 
+      !rawKey.includes("PASTE_HERE") && 
+      !rawKey.includes("KEY_ANDA") && 
+      rawKey.length > 10
+    );
+    return {
+      enabled: hasServerKey,
+      hasServerKey: hasServerKey,
+      provider: "gemini",
+      model: "gemini-2.5-flash"
+    };
+  };
+
   // Endpoint Autentikasi Login Aman Server-Side (Cegah Bocor Password ke Client)
   if (pathname === "/api/auth/login") {
     if (req.method !== "POST") {
@@ -585,12 +604,20 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {}
 
       try {
+        const rawServerKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "")
+          .trim()
+          .replace(/^["']|["']$/g, "")
+          .trim();
+        const cleanApiKey = (payload.apiKey && payload.apiKey !== "server-managed" && !payload.apiKey.startsWith("server-"))
+          ? payload.apiKey.trim()
+          : rawServerKey;
+
         const { polishJournalNode } = await import("./aiServiceNode.js");
         const result = await polishJournalNode({
           rawText: payload.rawText || "",
           jabatan: payload.jabatan || "",
           unitKerja: payload.unitKerja || "",
-          apiKey: payload.apiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ""
+          apiKey: cleanApiKey
         });
 
         res.statusCode = 200;
@@ -617,6 +644,13 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/api/bot-status") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(getBotConfig()));
+    return;
+  }
+
+  // Handler Status Konfigurasi Gemini AI Server-Side (Aman tanpa membocorkan API Key)
+  if (pathname === "/api/ai-status" || pathname === "/api/ai/status") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(getAiConfig()));
     return;
   }
 
@@ -674,6 +708,7 @@ const server = http.createServer(async (req, res) => {
         accounts,
         journals,
         botConfig: getBotConfig(),
+        aiConfig: getAiConfig(),
         timestamp: new Date().toISOString()
       }));
       return;
@@ -1134,6 +1169,7 @@ async function startServer() {
       }
     }
 
+    const aiConfigInfo = getAiConfig();
     console.log(`
 ========================================================================
 🚀 [EASYPANEL / PRODUCTION SERVER] E-KINERJA AI AKTIF!
@@ -1141,6 +1177,7 @@ async function startServer() {
 🌐 Web App Port   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}
 📊 API Sync Path  : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/api/sync
 🗄️ Database Mode  : ${dbStatus}
+✨ Gemini AI      : ${aiConfigInfo.hasServerKey ? "Aktif (Google Gemini 2.5 Flash Online)" : "Mode Cerdas Heuristik ASN (Offline/Tanpa Key)"}
 🩺 Health Check   : http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}/health
 🤖 Telegram Bot   : ${process.env.TELEGRAM_BOT_TOKEN ? "Aktif Otomatis (Polling Siap)" : "Standby (Menunggu Token di Environment Easypanel)"}
 ========================================================================

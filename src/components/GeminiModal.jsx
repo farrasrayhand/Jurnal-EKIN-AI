@@ -19,11 +19,12 @@ export default function GeminiModal({
   currentUser,
   onSaveUserKey,
   envApiKey,
+  serverAiConfig = null,
   allowEnvKey,
   onToggleAllowEnvKey
 }) {
   const isSuperadmin = currentUser?.role === "superadmin";
-  const hasEnvKey = Boolean(envApiKey);
+  const hasEnvKey = Boolean(envApiKey) || Boolean(serverAiConfig?.hasServerKey || serverAiConfig?.enabled);
   const isAllowedEnv = isSuperadmin || (typeof currentUser?.allowEnvKey === "boolean" ? currentUser.allowEnvKey : allowEnvKey);
 
   // State Pilihan Sumber Key: "env" | "personal"
@@ -47,7 +48,7 @@ export default function GeminiModal({
         setKeyChoice("personal");
       }
     }
-  }, [currentUser, allowEnvKey, hasEnvKey, isAllowedEnv]);
+  }, [currentUser, allowEnvKey, hasEnvKey, isAllowedEnv, serverAiConfig]);
 
   if (!isOpen) return null;
 

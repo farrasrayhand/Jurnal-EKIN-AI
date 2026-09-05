@@ -180,6 +180,43 @@ export function getTelegramBotConfig() {
   return cachedBotConfig;
 }
 
+// Cache status Gemini AI server-side
+let cachedAiConfig = {
+  enabled: false,
+  hasServerKey: false,
+  model: "gemini-2.5-flash"
+};
+
+/**
+ * Mengambil konfigurasi status Gemini AI server-side saat ini
+ */
+export function getServerAiConfig() {
+  return cachedAiConfig;
+}
+
+/**
+ * Memperbarui status Gemini AI secara asinkron dari backend
+ */
+export async function fetchServerAiStatus() {
+  try {
+    const res = await fetch("/api/ai/status");
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data.hasServerKey !== "undefined") {
+        cachedAiConfig = {
+          enabled: Boolean(data.hasServerKey || data.enabled),
+          hasServerKey: Boolean(data.hasServerKey || data.enabled),
+          model: data.model || "gemini-2.5-flash"
+        };
+        return cachedAiConfig;
+      }
+    }
+  } catch (e) {
+    // Mode offline / static
+  }
+  return cachedAiConfig;
+}
+
 /**
  * Memperbarui status Bot Telegram secara asinkron dari server/backend
  */
@@ -216,6 +253,13 @@ export async function syncWithBackend() {
           username: data.botConfig.username || ""
         };
       }
+      if (data && data.aiConfig) {
+        cachedAiConfig = {
+          enabled: Boolean(data.aiConfig.hasServerKey || data.aiConfig.enabled),
+          hasServerKey: Boolean(data.aiConfig.hasServerKey || data.aiConfig.enabled),
+          model: data.aiConfig.model || "gemini-2.5-flash"
+        };
+      }
       if (data && Array.isArray(data.accounts)) {
         const local = getAccounts();
         const map = new Map(local.map(a => [a.id || a.username, a]));
@@ -235,7 +279,8 @@ export async function syncWithBackend() {
         accounts: getAccounts(),
         journals: Array.isArray(data?.journals) ? data.journals : [],
         settings: data?.settings || {},
-        botConfig: cachedBotConfig
+        botConfig: cachedBotConfig,
+        aiConfig: cachedAiConfig
       };
     }
   } catch (e) {
@@ -629,25 +674,29 @@ export function setAllAccountsEnvPermission(allow) {
   return updated;
 }
 
-export function resolveEffectiveApiKey(currentUser, envApiKey) {
+export function resolveEffectiveApiKey(currentUser, envApiKey, serverAiConfig = null) {
   const isSuperadmin = currentUser?.role === "superadmin";
   const userAllowedEnv = isUserAllowedEnv(currentUser);
+  const aiConfig = serverAiConfig || cachedAiConfig;
+  const serverHasKey = Boolean(aiConfig?.hasServerKey || aiConfig?.enabled);
 
   // Jika user memilih menggunakan key pribadi dan ada isinya
   if (currentUser?.usePersonalKey && currentUser?.personalApiKey) {
     return {
       key: currentUser.personalApiKey,
       source: "personal",
-      label: isSuperadmin ? "Key Pribadi Admin" : "Key Pribadi Akun"
+      label: isSuperadmin ? "Key Pribadi Admin" : "Key Pribadi Akun",
+      isOnline: true
     };
   }
 
-  // Jika diizinkan memakai .env dan .env memiliki key
-  if (userAllowedEnv && envApiKey) {
+  // Jika diizinkan memakai .env dan .env memiliki key (baik client Vite maupun server Node.js)
+  if (userAllowedEnv && (envApiKey || serverHasKey)) {
     return {
-      key: envApiKey,
+      key: envApiKey || "server-managed",
       source: "env",
-      label: "Sistem (.env)"
+      label: "Sistem (.env)",
+      isOnline: true
     };
   }
 
@@ -656,14 +705,16 @@ export function resolveEffectiveApiKey(currentUser, envApiKey) {
     return {
       key: currentUser.personalApiKey,
       source: "personal",
-      label: "Key Pribadi Akun"
+      label: "Key Pribadi Akun",
+      isOnline: true
     };
   }
 
   return {
     key: "",
     source: "none",
-    label: "Belum Ada Key"
+    label: "Mode Offline",
+    isOnline: false
   };
 }
 

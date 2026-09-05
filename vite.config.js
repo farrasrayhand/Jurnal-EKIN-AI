@@ -61,10 +61,39 @@ function apiSyncPlugin() {
         }
       }
 
+      const getAiConfig = () => {
+        const rawKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '')
+          .trim()
+          .replace(/^["']|["']$/g, '')
+          .trim()
+        const hasServerKey = Boolean(
+          rawKey &&
+          !rawKey.includes('PASTE_HERE') &&
+          !rawKey.includes('KEY_ANDA') &&
+          rawKey.length > 10
+        )
+        return {
+          enabled: hasServerKey,
+          hasServerKey: hasServerKey,
+          provider: 'gemini',
+          model: 'gemini-2.5-flash'
+        }
+      }
+
       // Endpoint status Bot Telegram
       server.middlewares.use('/api/bot-status', (req, res) => {
         res.setHeader('Content-Type', 'application/json')
         res.end(JSON.stringify(getBotConfig()))
+      })
+
+      // Endpoint status Gemini AI Server-Side (Aman)
+      server.middlewares.use('/api/ai-status', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify(getAiConfig()))
+      })
+      server.middlewares.use('/api/ai/status', (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify(getAiConfig()))
       })
 
       // Endpoint AI Polish Server-Side (/api/ai/polish)
@@ -83,12 +112,20 @@ function apiSyncPlugin() {
           } catch (e) {}
 
           try {
+            const rawServerKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '')
+              .trim()
+              .replace(/^["']|["']$/g, '')
+              .trim()
+            const cleanApiKey = (payload.apiKey && payload.apiKey !== 'server-managed' && !payload.apiKey.startsWith('server-'))
+              ? payload.apiKey.trim()
+              : rawServerKey
+
             const { polishJournalNode } = await import('./server/aiServiceNode.js')
             const result = await polishJournalNode({
               rawText: payload.rawText || '',
               jabatan: payload.jabatan || '',
               unitKerja: payload.unitKerja || '',
-              apiKey: payload.apiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || ''
+              apiKey: cleanApiKey
             })
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify(result))
@@ -490,6 +527,7 @@ function apiSyncPlugin() {
             payload.accounts = payload.accounts.map(sanitizeUser)
           }
           payload.botConfig = getBotConfig()
+          payload.aiConfig = getAiConfig()
           res.setHeader('Content-Type', 'application/json')
           res.end(JSON.stringify(payload))
         } else if (req.method === 'POST') {

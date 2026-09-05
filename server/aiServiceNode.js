@@ -14,7 +14,10 @@ export async function polishJournalNode({
     throw new Error("Tuliskan catatan aktivitas kasaran terlebih dahulu!");
   }
 
-  const effectiveKey = apiKey || process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+  const rawServerKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "").trim().replace(/^["']|["']$/g, "").trim();
+  const effectiveKey = (apiKey && apiKey !== "server-managed" && !apiKey.startsWith("server-"))
+    ? apiKey.trim()
+    : rawServerKey;
 
   // 1. Coba gunakan Gemini API jika API Key tersedia
   if (effectiveKey) {

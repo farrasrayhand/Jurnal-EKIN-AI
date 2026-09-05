@@ -369,7 +369,7 @@ export default function JournalSection({
       let notifMsg = `✨ Berhasil! Catatan kasaran telah dipoles ke bahasa baku formal kedinasan ASN (${geminiApiKey ? "Gemini Online" : "Mode Cerdas Offline"}).`;
       if (result.source === "offline_429") {
         notifMsg = "⚠️ Kuota Gemini AI di Google AI Studio habis (Error 429: Prepayment credits depleted). Sistem otomatis beralih memoles dengan Mode Cerdas Offline bawaan!";
-      } else if (result.source === "gemini") {
+      } else if (result.source === "gemini" || result.source === "gemini-ai" || result.source === "server-ai") {
         notifMsg = "✨ Berhasil! Catatan kasaran telah dipoles menggunakan Gemini AI Online.";
       } else {
         notifMsg = "✨ Berhasil! Catatan kasaran telah dipoles menggunakan Mode Cerdas Offline bawaan.";

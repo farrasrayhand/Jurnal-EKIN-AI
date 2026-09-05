@@ -24,6 +24,8 @@ import {
   pushSyncToBackend,
   getTelegramBotConfig,
   fetchTelegramBotStatus,
+  getServerAiConfig,
+  fetchServerAiStatus,
   getSessionInfo
 } from "./services/accountService";
 
@@ -35,6 +37,9 @@ export default function App() {
 
   // Status integrasi bot telegram (sembunyi otomatis jika belum di-set di env)
   const [botConfig, setBotConfig] = useState(() => getTelegramBotConfig());
+
+  // Status integrasi Gemini AI server-side (aktif otomatis jika GEMINI_API_KEY diset di backend env)
+  const [serverAiConfig, setServerAiConfig] = useState(() => getServerAiConfig());
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -69,6 +74,9 @@ export default function App() {
       if (res) {
         if (res.botConfig) {
           setBotConfig(res.botConfig);
+        }
+        if (res.aiConfig) {
+          setServerAiConfig(res.aiConfig);
         }
         if (Array.isArray(res.journals)) {
           isRemoteSyncRef.current = true;
@@ -122,6 +130,9 @@ export default function App() {
     initAccountDatabase();
     fetchTelegramBotStatus().then(cfg => {
       if (cfg) setBotConfig(cfg);
+    });
+    fetchServerAiStatus().then(cfg => {
+      if (cfg) setServerAiConfig(cfg);
     });
     fetchAndSyncJournals();
   }, [fetchAndSyncJournals]);
@@ -303,12 +314,12 @@ export default function App() {
     setAllowEnvKeySetting(allowed);
   };
 
-  // Gemini API Key dari .env
+  // Gemini API Key dari .env (Client-side Vite build atau Server-side Node.js runtime)
   const envApiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-  const isKeyFromEnv = Boolean(envApiKey);
+  const isKeyFromEnv = Boolean(envApiKey) || Boolean(serverAiConfig?.hasServerKey || serverAiConfig?.enabled);
 
   // Hitung API Key Efektif (Apakah menggunakan .env atau key akun pribadi)
-  const effectiveApiKeyInfo = resolveEffectiveApiKey(currentUser, envApiKey);
+  const effectiveApiKeyInfo = resolveEffectiveApiKey(currentUser, envApiKey, serverAiConfig);
   const activeGeminiKey = effectiveApiKeyInfo.key;
 
   // Modal Gemini Key
@@ -467,7 +478,7 @@ export default function App() {
         onUserChanged={handleUserChanged}
         allowEnvKey={allowEnvKey}
         onToggleAllowEnvKey={handleToggleAllowEnvKey}
-        hasEnvKey={Boolean(envApiKey)}
+        hasEnvKey={isKeyFromEnv}
         onOpenGeminiSettings={() => {
           setIsAccountModalOpen(false);
           setIsGeminiModalOpen(true);
@@ -501,6 +512,7 @@ export default function App() {
         currentUser={currentUser}
         onSaveUserKey={handleSaveUserKey}
         envApiKey={envApiKey}
+        serverAiConfig={serverAiConfig}
         allowEnvKey={allowEnvKey}
         onToggleAllowEnvKey={handleToggleAllowEnvKey}
       />
