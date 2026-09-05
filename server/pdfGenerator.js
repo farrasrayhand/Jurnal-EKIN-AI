@@ -166,16 +166,7 @@ export function generateMonthlyReportPdf({
       const monthName = NAMA_BULAN[monthIndex] || "Juli";
       const uppercaseMonth = monthName.toUpperCase();
 
-      const rawGdrive = (gdriveLink || "").trim();
-      const hasValidGdrive = Boolean(
-        rawGdrive &&
-        rawGdrive !== "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz" &&
-        rawGdrive !== "https://google.com" &&
-        rawGdrive !== "https://google.com/" &&
-        rawGdrive !== "http://google.com" &&
-        rawGdrive !== "http://google.com/"
-      );
-      const effectiveGdrive = hasValidGdrive ? rawGdrive : "";
+      const effectiveGdrive = (gdriveLink || "").trim();
 
       // 1. JUDUL LAPORAN
       doc.font("Times-Bold").fontSize(13).text("LAPORAN BULANAN KINERJA PEGAWAI", { align: "center", underline: true });
@@ -381,7 +372,7 @@ export function generateMonthlyReportPdf({
       // -------------------------------------------------------------
       // 4. FOOTER TAUTAN GOOGLE DRIVE (Hanya jika link diisi)
       // -------------------------------------------------------------
-      if (hasValidGdrive) {
+      if (effectiveGdrive) {
         if (tableY + 130 > 770) {
           doc.addPage();
           tableY = 40;

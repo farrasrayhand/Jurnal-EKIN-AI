@@ -36,31 +36,9 @@ export default function MonthlyReportGenerator({
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const EXAMPLE_GDRIVE_LINK = "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz";
   const [gdriveLink, setGdriveLink] = useState(() => {
-    const saved = localStorage.getItem("ekinerja_gdrive_link");
-    // Jika belum diset atau masih bernilai link contoh/dummy, biarkan kosong
-    if (
-      !saved ||
-      saved === EXAMPLE_GDRIVE_LINK ||
-      saved.trim() === "https://google.com" ||
-      saved.trim() === "https://google.com/" ||
-      saved.trim() === "http://google.com" ||
-      saved.trim() === "http://google.com/"
-    ) {
-      return "";
-    }
-    return saved;
+    return localStorage.getItem("ekinerja_gdrive_link") || "";
   });
-  const hasValidGdrive = useMemo(() => {
-    const link = (gdriveLink || "").trim();
-    return Boolean(
-      link &&
-      link !== EXAMPLE_GDRIVE_LINK &&
-      link !== "https://google.com" &&
-      link !== "https://google.com/" &&
-      link !== "http://google.com" &&
-      link !== "http://google.com/"
-    );
-  }, [gdriveLink]);
+  const hasValidGdrive = Boolean(gdriveLink && gdriveLink.trim());
   const [isSavedLink, setIsSavedLink] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
