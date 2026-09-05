@@ -177,6 +177,9 @@ export async function initPostgresDatabase() {
         );
       `);
 
+      // Bersihkan entitas penilai lawas jika pernah tersimpan di database
+      await client.query("DELETE FROM system_settings WHERE setting_key = 'penilai'");
+
       // 7. SEEDER OTOMATIS: JALANKAN JIKA TABEL ACCOUNTS KOSONG
       const accRes = await client.query("SELECT COUNT(*) AS count FROM accounts");
       let accountCount = parseInt(accRes.rows[0]?.count || "0", 10);
@@ -410,12 +413,9 @@ export async function loadStoreFromPostgres() {
 
       // Ambil System Settings
       const setRes = await client.query("SELECT * FROM system_settings");
-      let penilai = DEFAULT_PENILAI;
       let settings = { gdriveLink: "" };
       setRes.rows.forEach(r => {
-        if (r.setting_key === "penilai") {
-          try { penilai = JSON.parse(r.setting_val); } catch (e) {}
-        } else if (r.setting_key === "settings") {
+        if (r.setting_key === "settings") {
           try { settings = JSON.parse(r.setting_val); } catch (e) {}
         }
       });
@@ -426,7 +426,6 @@ export async function loadStoreFromPostgres() {
         registrationCodes,
         webSessions,
         telegramSessions,
-        penilai,
         settings,
         updatedAt: new Date().toISOString()
       };
@@ -625,16 +624,8 @@ export async function syncStoreToPostgres(store) {
         }
       }
 
-      // Sinkronkan Penilai & Settings
-      if (store.penilai) {
-        await client.query(`
-          INSERT INTO system_settings (setting_key, setting_val, updated_at)
-          VALUES ('penilai', $1, $2)
-          ON CONFLICT (setting_key) DO UPDATE SET
-            setting_val = EXCLUDED.setting_val,
-            updated_at = EXCLUDED.updated_at
-        `, [JSON.stringify(store.penilai), new Date().toISOString()]);
-      }
+      // Hapus entitas penilai jika masih tersimpan di DB
+      await client.query("DELETE FROM system_settings WHERE setting_key = 'penilai'");
       if (store.settings) {
         await client.query(`
           INSERT INTO system_settings (setting_key, setting_val, updated_at)

@@ -164,7 +164,7 @@ export async function initMysqlDatabase() {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
 
-      // 6. Tabel System Settings (Penilai, GDrive, dll.)
+      // 6. Tabel System Settings (GDrive, konfigurasi, dll.)
       await conn.query(`
         CREATE TABLE IF NOT EXISTS system_settings (
           setting_key VARCHAR(100) PRIMARY KEY,
@@ -172,6 +172,9 @@ export async function initMysqlDatabase() {
           updated_at VARCHAR(50)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
+
+      // Bersihkan entitas penilai lawas jika pernah tersimpan di database
+      await conn.query("DELETE FROM system_settings WHERE setting_key = 'penilai'");
 
       // ======================================================================
       // 7. SEEDER OTOMATIS: JALANKAN JIKA TABEL ACCOUNTS KOSONG
@@ -374,12 +377,9 @@ export async function loadStoreFromMysql() {
 
       // Ambil System Settings
       const [setRows] = await conn.query("SELECT * FROM system_settings");
-      let penilai = DEFAULT_PENILAI;
       let settings = { gdriveLink: "" };
       setRows.forEach(r => {
-        if (r.setting_key === "penilai") {
-          try { penilai = JSON.parse(r.setting_val); } catch (e) {}
-        } else if (r.setting_key === "settings") {
+        if (r.setting_key === "settings") {
           try { settings = JSON.parse(r.setting_val); } catch (e) {}
         }
       });
@@ -390,7 +390,6 @@ export async function loadStoreFromMysql() {
         registrationCodes,
         webSessions,
         telegramSessions,
-        penilai,
         settings,
         updatedAt: new Date().toISOString()
       };
@@ -590,14 +589,8 @@ export async function syncStoreToMysql(store) {
         }
       }
 
-      // Sinkronkan Penilai & Settings
-      if (store.penilai) {
-        await conn.query(`
-          INSERT INTO system_settings (setting_key, setting_val, updated_at)
-          VALUES ('penilai', ?, ?)
-          ON DUPLICATE KEY UPDATE setting_val = VALUES(setting_val), updated_at = VALUES(updated_at)
-        `, [JSON.stringify(store.penilai), new Date().toISOString()]);
-      }
+      // Hapus entitas penilai jika masih tersimpan di DB
+      await conn.query("DELETE FROM system_settings WHERE setting_key = 'penilai'");
       if (store.settings) {
         await conn.query(`
           INSERT INTO system_settings (setting_key, setting_val, updated_at)

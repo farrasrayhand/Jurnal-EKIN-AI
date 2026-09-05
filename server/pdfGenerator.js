@@ -167,7 +167,16 @@ export function generateMonthlyReportPdf({
       const monthName = NAMA_BULAN[monthIndex] || "Juli";
       const uppercaseMonth = monthName.toUpperCase();
 
-      const effectiveGdrive = (gdriveLink || "").trim();
+      const rawGdrive = (gdriveLink || "").trim();
+      const hasValidGdrive = Boolean(
+        rawGdrive &&
+        rawGdrive !== "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz" &&
+        rawGdrive !== "https://google.com" &&
+        rawGdrive !== "https://google.com/" &&
+        rawGdrive !== "http://google.com" &&
+        rawGdrive !== "http://google.com/"
+      );
+      const effectiveGdrive = hasValidGdrive ? rawGdrive : "";
 
       // 1. JUDUL LAPORAN
       doc.font("Times-Bold").fontSize(13).text("LAPORAN BULANAN KINERJA PEGAWAI", { align: "center", underline: true });
@@ -371,33 +380,41 @@ export function generateMonthlyReportPdf({
       }
 
       // -------------------------------------------------------------
-      // 4. FOOTER TAUTAN GOOGLE DRIVE
+      // 4. FOOTER TAUTAN GOOGLE DRIVE (Hanya jika link diisi)
       // -------------------------------------------------------------
-      if (tableY + 130 > 770) {
-        doc.addPage();
-        tableY = 40;
+      if (hasValidGdrive) {
+        if (tableY + 130 > 770) {
+          doc.addPage();
+          tableY = 40;
+        }
+
+        doc.y = tableY + 12;
+        doc.strokeColor("#94a3b8").dash(2, { space: 2 }).moveTo(tableLeft, doc.y).lineTo(tableLeft + tableWidth, doc.y).stroke().undash();
+        doc.moveDown(0.5);
+
+        doc.fillColor("#334155").font("Times-Roman").fontSize(8);
+        doc.text(`* Dokumen asli dan seluruh berkas pendukung tersimpan secara digital pada Google Drive:`, tableLeft, doc.y);
+        doc.moveDown(0.3);
+
+        doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(8.5);
+        doc.text(effectiveGdrive, tableLeft, doc.y, {
+          link: effectiveGdrive,
+          underline: true
+        });
+
+        doc.moveDown(1.5);
+      } else {
+        if (tableY + 90 > 770) {
+          doc.addPage();
+          tableY = 40;
+        }
+        doc.y = tableY + 14;
       }
-
-      doc.y = tableY + 12;
-      doc.strokeColor("#94a3b8").dash(2, { space: 2 }).moveTo(tableLeft, doc.y).lineTo(tableLeft + tableWidth, doc.y).stroke().undash();
-      doc.moveDown(0.5);
-
-      doc.fillColor("#334155").font("Times-Roman").fontSize(8);
-      doc.text(`* Dokumen asli dan seluruh berkas pendukung tersimpan secara digital pada Google Drive:`, tableLeft, doc.y);
-      doc.moveDown(0.3);
-
-      doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(8.5);
-      doc.text(effectiveGdrive, tableLeft, doc.y, {
-        link: effectiveGdrive,
-        underline: true
-      });
-
-      doc.moveDown(1.5);
 
       // -------------------------------------------------------------
       // 5. TANDA TANGAN (PEGAWAI YANG MEMBUAT LAPORAN)
       // -------------------------------------------------------------
-      const hasPenilai = Boolean(penilai && penilai.nama && penilai.nama.trim() && penilai.nama !== "ANDA SUPANDA, S.Pd, M.Pd");
+      const hasPenilai = Boolean(penilai && penilai.nama && penilai.nama.trim() && !penilai.nama.includes("ANDA SUPANDA"));
       const signY = doc.y;
 
       if (hasPenilai) {

@@ -365,7 +365,7 @@ function apiSyncPlugin() {
           || storeData.accounts?.[0]
           || { nama: 'Pegawai E-Kinerja', nip: '200011192025211007', pangkat: 'Pengatur Muda / II/a', jabatan: 'Staff', unitKerja: 'Instansi' }
         const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username)
-        const penilai = storeData.penilai || { nama: 'ANDA SUPANDA, S.Pd, M.Pd', nip: '197505201998021001', pangkat: 'Pembina Tingkat I / IV/b', jabatan: 'Kepala Sekolah' }
+        const penilai = null
 
         try {
           const { zipBuffer, zipFileName } = await generateMonthlyReportZip({
@@ -411,7 +411,7 @@ function apiSyncPlugin() {
           || storeData.accounts?.[0]
           || { nama: 'Pegawai E-Kinerja', nip: '200011192025211007', pangkat: 'Pengatur Muda / II/a', jabatan: 'Staff', unitKerja: 'Instansi' }
         const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username)
-        const penilai = storeData.penilai || { nama: 'ANDA SUPANDA, S.Pd, M.Pd', nip: '197505201998021001', pangkat: 'Pembina Tingkat I / IV/b', jabatan: 'Kepala Sekolah' }
+        const penilai = null
 
         try {
           const pdfBuffer = await generateMonthlyReportPdf({

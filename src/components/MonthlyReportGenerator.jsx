@@ -37,12 +37,30 @@ export default function MonthlyReportGenerator({
   const EXAMPLE_GDRIVE_LINK = "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz";
   const [gdriveLink, setGdriveLink] = useState(() => {
     const saved = localStorage.getItem("ekinerja_gdrive_link");
-    // Jika belum diset atau masih bernilai link contoh bawaan lama, biarkan kosong (sebagai placeholder saja)
-    if (!saved || saved === EXAMPLE_GDRIVE_LINK) {
+    // Jika belum diset atau masih bernilai link contoh/dummy, biarkan kosong
+    if (
+      !saved ||
+      saved === EXAMPLE_GDRIVE_LINK ||
+      saved.trim() === "https://google.com" ||
+      saved.trim() === "https://google.com/" ||
+      saved.trim() === "http://google.com" ||
+      saved.trim() === "http://google.com/"
+    ) {
       return "";
     }
     return saved;
   });
+  const hasValidGdrive = useMemo(() => {
+    const link = (gdriveLink || "").trim();
+    return Boolean(
+      link &&
+      link !== EXAMPLE_GDRIVE_LINK &&
+      link !== "https://google.com" &&
+      link !== "https://google.com/" &&
+      link !== "http://google.com" &&
+      link !== "http://google.com/"
+    );
+  }, [gdriveLink]);
   const [isSavedLink, setIsSavedLink] = useState(false);
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
@@ -795,16 +813,16 @@ export default function MonthlyReportGenerator({
           )}
         </div>
 
-        {/* TAUTAN PENYIMPANAN DIGITAL DI GOOGLE DRIVE (FOOTER RESMI) */}
-        <div style={{ 
-          marginTop: "25px", 
-          paddingTop: "8px", 
-          borderTop: "1px dashed #000000", 
-          fontSize: "8.5pt", 
-          color: "#334155" 
-        }}>
-          <span>* Dokumen asli dan seluruh berkas pendukung tersimpan secara digital pada Google Drive:{' '}</span>
-          {gdriveLink ? (
+        {/* TAUTAN PENYIMPANAN DIGITAL DI GOOGLE DRIVE (FOOTER RESMI - HANYA JIKA DIISI) */}
+        {hasValidGdrive && (
+          <div style={{ 
+            marginTop: "25px", 
+            paddingTop: "8px", 
+            borderTop: "1px dashed #000000", 
+            fontSize: "8.5pt", 
+            color: "#334155" 
+          }}>
+            <span>* Dokumen asli dan seluruh berkas pendukung tersimpan secara digital pada Google Drive:{' '}</span>
             <a 
               href={gdriveLink} 
               target="_blank" 
@@ -821,20 +839,8 @@ export default function MonthlyReportGenerator({
             >
               {gdriveLink}
             </a>
-          ) : (
-            <span 
-              style={{ 
-                fontFamily: "monospace", 
-                color: "#64748b", 
-                fontStyle: "italic",
-                wordBreak: "break-all"
-              }}
-              title="Tautan Google Drive belum diisi (contoh di latar belakang)"
-            >
-              (Belum diisi — Contoh: https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz)
-            </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Edit Identitas Pegawai */}
