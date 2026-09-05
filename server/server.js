@@ -890,7 +890,7 @@ const server = http.createServer((req, res) => {
     const userId = parsedUrl.searchParams.get("userId") || "";
     const gdriveLink = parsedUrl.searchParams.get("gdriveLink") || "";
 
-    let storeData = { accounts: [], journals: [], penilai: null };
+    let storeData = { accounts: [], journals: [] };
     if (fs.existsSync(DB_FILE)) {
       try {
         storeData = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
@@ -903,12 +903,10 @@ const server = http.createServer((req, res) => {
       || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
 
     const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username);
-    const penilai = null;
 
     if (pathname === "/api/reports/pdf") {
       generateMonthlyReportPdf({
         pegawai: targetUser,
-        penilai,
         journals: userJournals,
         month,
         year,
@@ -936,7 +934,6 @@ const server = http.createServer((req, res) => {
 
     generateMonthlyReportZip({
       pegawai: targetUser,
-      penilai,
       journals: userJournals,
       month,
       year,

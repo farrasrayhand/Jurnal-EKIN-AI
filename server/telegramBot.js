@@ -1250,7 +1250,6 @@ export async function handleReport(botInstance, msg, match) {
 
     const reportBundle = await generateMonthlyReportZip({
       pegawai: user,
-      penilai: null,
       journals: userJournals,
       month: targetMonth,
       year: targetYear,

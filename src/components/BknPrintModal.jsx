@@ -7,7 +7,6 @@ export default function BknPrintModal({
   isOpen,
   onClose,
   pegawai,
-  penilai,
   periode,
   intervensiPimpinan,
   rhkList,
@@ -76,54 +75,37 @@ export default function BknPrintModal({
             </p>
           </div>
 
-          {/* Tabel Profil Pegawai & Pejabat Penilai */}
+          {/* Tabel Profil Pegawai */}
           <table className="bkn-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "9.5pt", marginBottom: "12px" }}>
             <tbody>
               <tr style={{ fontWeight: "bold", backgroundColor: "#f2f2f2" }}>
-                <td style={{ width: "5%", textAlign: "center", border: "1px solid #000" }}>NO</td>
-                <td colSpan={2} style={{ width: "45%", border: "1px solid #000" }}>PEGAWAI YANG DINILAI</td>
-                <td style={{ width: "5%", textAlign: "center", border: "1px solid #000" }}>NO</td>
-                <td colSpan={2} style={{ width: "45%", border: "1px solid #000" }}>PEJABAT PENILAI KINERJA</td>
+                <td style={{ width: "8%", textAlign: "center", border: "1px solid #000" }}>NO</td>
+                <td colSpan={2} style={{ border: "1px solid #000" }}>DATA IDENTITAS PEGAWAI</td>
               </tr>
               <tr>
                 <td style={{ textAlign: "center", border: "1px solid #000" }}>1</td>
-                <td style={{ width: "15%", border: "1px solid #000" }}>Nama</td>
-                <td style={{ width: "30%", border: "1px solid #000" }}>{pegawai.nama || "-"}</td>
-                <td style={{ textAlign: "center", border: "1px solid #000" }}>1</td>
-                <td style={{ width: "15%", border: "1px solid #000" }}>Nama</td>
-                <td style={{ width: "30%", border: "1px solid #000" }}>{penilai.nama || "-"}</td>
+                <td style={{ width: "25%", border: "1px solid #000" }}>Nama Lengkap</td>
+                <td style={{ border: "1px solid #000" }}>{pegawai.nama || "-"}</td>
               </tr>
               <tr>
                 <td style={{ textAlign: "center", border: "1px solid #000" }}>2</td>
                 <td style={{ border: "1px solid #000" }}>NIP</td>
                 <td style={{ border: "1px solid #000" }}>{pegawai.nip || "-"}</td>
-                <td style={{ textAlign: "center", border: "1px solid #000" }}>2</td>
-                <td style={{ border: "1px solid #000" }}>NIP</td>
-                <td style={{ border: "1px solid #000" }}>{penilai.nip || "-"}</td>
               </tr>
               <tr>
                 <td style={{ textAlign: "center", border: "1px solid #000" }}>3</td>
                 <td style={{ border: "1px solid #000" }}>Pangkat/Gol.</td>
                 <td style={{ border: "1px solid #000" }}>{pegawai.pangkat || "-"}</td>
-                <td style={{ textAlign: "center", border: "1px solid #000" }}>3</td>
-                <td style={{ border: "1px solid #000" }}>Pangkat/Gol.</td>
-                <td style={{ border: "1px solid #000" }}>{penilai.pangkat || "-"}</td>
               </tr>
               <tr>
                 <td style={{ textAlign: "center", border: "1px solid #000" }}>4</td>
                 <td style={{ border: "1px solid #000" }}>Jabatan</td>
                 <td style={{ border: "1px solid #000" }}>{pegawai.jabatan || "-"}</td>
-                <td style={{ textAlign: "center", border: "1px solid #000" }}>4</td>
-                <td style={{ border: "1px solid #000" }}>Jabatan</td>
-                <td style={{ border: "1px solid #000" }}>{penilai.jabatan || "-"}</td>
               </tr>
               <tr>
                 <td style={{ textAlign: "center", border: "1px solid #000" }}>5</td>
                 <td style={{ border: "1px solid #000" }}>Unit Kerja</td>
                 <td style={{ border: "1px solid #000" }}>{pegawai.unitKerja || "-"}</td>
-                <td style={{ textAlign: "center", border: "1px solid #000" }}>5</td>
-                <td style={{ border: "1px solid #000" }}>Unit Kerja</td>
-                <td style={{ border: "1px solid #000" }}>{penilai.unitKerja || "-"}</td>
               </tr>
             </tbody>
           </table>
@@ -378,29 +360,6 @@ export default function BknPrintModal({
               </table>
             </div>
           )}
-
-          {/* Kolom Tanda Tangan */}
-          <div className="bkn-signatures" style={{ marginTop: "30px", display: "flex", justifyContent: "space-between", fontSize: "10pt" }}>
-            <div className="bkn-sig-box" style={{ width: "45%", textAlign: "center" }}>
-              <p style={{ margin: 0 }}>Pegawai yang Dinilai,</p>
-              <div className="bkn-sig-space" style={{ height: "65px" }}></div>
-              <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
-                {pegawai.nama || "(Nama Pegawai)"}
-              </p>
-              <p style={{ margin: 0 }}>NIP. {pegawai.nip || "............................"}</p>
-            </div>
-
-            <div className="bkn-sig-box" style={{ width: "45%", textAlign: "center" }}>
-              <p style={{ margin: 0 }}>Ditetapkan di: {pegawai.unitKerja?.split("/")[0]?.trim() || "Tempat Tugas"}</p>
-              <p style={{ margin: 0 }}>Pada tanggal: {periode.mulai || "1 Januari 2026"}</p>
-              <p style={{ margin: "2px 0 0 0" }}>Pejabat Penilai Kinerja,</p>
-              <div className="bkn-sig-space" style={{ height: "65px" }}></div>
-              <p style={{ fontWeight: "bold", textDecoration: "underline", margin: 0 }}>
-                {penilai.nama || "(Nama Pejabat Penilai)"}
-              </p>
-              <p style={{ margin: 0 }}>NIP. {penilai.nip || "............................"}</p>
-            </div>
-          </div>
         </div>
 
         <div className="modal-footer no-print" style={{ background: "var(--bg-secondary)" }}>

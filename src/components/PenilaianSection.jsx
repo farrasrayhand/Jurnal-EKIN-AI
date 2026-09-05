@@ -52,7 +52,6 @@ const INITIAL_PERIODS = [
 
 export default function PenilaianSection({
   pegawai,
-  penilai,
   periode,
   rhkList,
   berakhlakList,

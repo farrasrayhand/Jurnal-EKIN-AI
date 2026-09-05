@@ -146,7 +146,7 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, [currentUser]);
 
-  // Data Profil Pegawai & Penilai (Sinkron otomatis dengan Akun yang Sedang Aktif)
+  // Data Profil Pegawai (Sinkron otomatis dengan Akun yang Sedang Aktif)
   const [pegawai, setPegawai] = useState(() => {
     const user = getCurrentUser();
     if (user && user.nama) {

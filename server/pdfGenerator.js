@@ -143,7 +143,6 @@ export function resolveJournalAttachment(jrn, uploadsDir = DEFAULT_UPLOADS_DIR) 
  */
 export function generateMonthlyReportPdf({
   pegawai,
-  penilai,
   journals = [],
   month = "07",
   year = "2026",
@@ -417,7 +416,6 @@ export function generateMonthlyReportPdf({
  */
 export async function generateMonthlyReportZip({
   pegawai,
-  penilai,
   journals = [],
   month = "07",
   year = "2026",
@@ -428,7 +426,7 @@ export async function generateMonthlyReportZip({
   const monthName = NAMA_BULAN[monthIndex] || "Bulan";
   const cleanPegawaiName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
 
-  const pdfBuffer = await generateMonthlyReportPdf({ pegawai, penilai, journals, month, year, gdriveLink, uploadsDir });
+  const pdfBuffer = await generateMonthlyReportPdf({ pegawai, journals, month, year, gdriveLink, uploadsDir });
   const pdfFileName = `Laporan_Kinerja_${monthName}_${year}_${cleanPegawaiName}.pdf`;
 
   const zip = new JSZip();

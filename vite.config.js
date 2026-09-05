@@ -354,7 +354,7 @@ function apiSyncPlugin() {
         const userId = u.searchParams.get('userId') || ''
         const gdriveLink = u.searchParams.get('gdriveLink') || ''
 
-        let storeData = { accounts: [], journals: [], penilai: null }
+        let storeData = { accounts: [], journals: [] }
         if (fs.existsSync(DB_FILE)) {
           try {
             storeData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'))
@@ -365,12 +365,10 @@ function apiSyncPlugin() {
           || storeData.accounts?.[0]
           || { nama: 'Pegawai E-Kinerja', nip: '200011192025211007', pangkat: 'Pengatur Muda / II/a', jabatan: 'Staff', unitKerja: 'Instansi' }
         const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username)
-        const penilai = null
 
         try {
           const { zipBuffer, zipFileName } = await generateMonthlyReportZip({
             pegawai: targetUser,
-            penilai,
             journals: userJournals,
             month,
             year,
@@ -400,7 +398,7 @@ function apiSyncPlugin() {
         const userId = u.searchParams.get('userId') || ''
         const gdriveLink = u.searchParams.get('gdriveLink') || ''
 
-        let storeData = { accounts: [], journals: [], penilai: null }
+        let storeData = { accounts: [], journals: [] }
         if (fs.existsSync(DB_FILE)) {
           try {
             storeData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'))
@@ -411,12 +409,10 @@ function apiSyncPlugin() {
           || storeData.accounts?.[0]
           || { nama: 'Pegawai E-Kinerja', nip: '200011192025211007', pangkat: 'Pengatur Muda / II/a', jabatan: 'Staff', unitKerja: 'Instansi' }
         const userJournals = (storeData.journals || []).filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username)
-        const penilai = null
 
         try {
           const pdfBuffer = await generateMonthlyReportPdf({
             pegawai: targetUser,
-            penilai,
             journals: userJournals,
             month,
             year,

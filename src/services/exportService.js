@@ -4,7 +4,7 @@ import { deriveUkuranKeberhasilan } from "./aiService";
 /**
  * Ekspor Data SKP lengkap ke file Excel (.xlsx) dengan format PermenPAN-RB No. 6 Tahun 2022
  */
-export function exportToExcel(pegawai, penilai, periode, rhkList, berakhlakList, intervensiPimpinan, pendekatan = "KUANTITATIF") {
+export function exportToExcel(pegawai, periode, rhkList, berakhlakList, intervensiPimpinan, pendekatan = "KUANTITATIF") {
   const wb = XLSX.utils.book_new();
   const isKualitatif = pendekatan === "KUALITATIF";
 
@@ -14,12 +14,12 @@ export function exportToExcel(pegawai, penilai, periode, rhkList, berakhlakList,
     ["SESUAI PERMENPAN-RB NO. 6 TAHUN 2022 / STANDAR BKN"],
     ["PERIODE PENILAIAN:", periode.mulai || "1 Januari 2026", "s.d.", periode.selesai || "31 Desember 2026"],
     [],
-    ["A. PEGAWAI YANG DINILAI", "", "", "B. PEJABAT PENILAI KINERJA", ""],
-    ["1. NAMA", pegawai.nama || "-", "", "1. NAMA", penilai.nama || "-"],
-    ["2. NIP", pegawai.nip || "-", "", "2. NIP", penilai.nip || "-"],
-    ["3. PANGKAT / GOL", pegawai.pangkat || "-", "", "3. PANGKAT / GOL", penilai.pangkat || "-"],
-    ["4. JABATAN", pegawai.jabatan || "-", "", "4. JABATAN", penilai.jabatan || "-"],
-    ["5. UNIT KERJA", pegawai.unitKerja || "-", "", "5. UNIT KERJA", penilai.unitKerja || "-"],
+    ["DATA PEGAWAI", ""],
+    ["1. NAMA", pegawai.nama || "-"],
+    ["2. NIP", pegawai.nip || "-"],
+    ["3. PANGKAT / GOL", pegawai.pangkat || "-"],
+    ["4. JABATAN", pegawai.jabatan || "-"],
+    ["5. UNIT KERJA", pegawai.unitKerja || "-"],
     [],
     ["RENCANA KINERJA PIMPINAN YANG DIINTERVENSI:", intervensiPimpinan || "-"],
     []
