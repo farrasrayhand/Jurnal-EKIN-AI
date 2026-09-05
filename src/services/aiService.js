@@ -510,7 +510,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
         if (content) {
           const parsed = JSON.parse(content);
           return {
-            aktivitas: parsed.aktivitas || rawText,
+            aktivitas: cleanDuplicatePhrases(parsed.aktivitas || rawText),
             outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
             rhkId: parsed.rhkId || (rhkList[0]?.id || ""),
             catatan: parsed.catatan || "Terselesaikan dalam kondisi optimal.",
@@ -539,10 +539,49 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
 }
 
 /**
+ * Algoritma NLP untuk mendeteksi dan menghapus frasa/klausa yang terduplikasi secara berulang
+ * Bekerja dinamis untuk frasa apa pun (tidak terbatas pada daftar statis)
+ */
+export function cleanDuplicatePhrases(str) {
+  if (!str || typeof str !== "string") return "";
+  let cleaned = str.trim();
+
+  // 1. Bersihkan pengulangan klausa / kalimat berturut-turut (panjang 2 s/d 35 kata)
+  let changed = true;
+  let guard = 0;
+  while (changed && guard < 10) {
+    changed = false;
+    guard++;
+    const words = cleaned.split(/\s+/);
+    if (words.length >= 4) {
+      const maxLen = Math.floor(words.length / 2);
+      for (let len = Math.min(maxLen, 35); len >= 2; len--) {
+        const p1 = words.slice(0, len).join(" ").toLowerCase().replace(/[,.:;]+$/, "");
+        const p2 = words.slice(len, len * 2).join(" ").toLowerCase().replace(/[,.:;]+$/, "");
+        if (p1 === p2 && p1.length > 5) {
+          words.splice(0, len);
+          cleaned = words.join(" ").replace(/^[,.:;\s]+/, "").trim();
+          changed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Bersihkan kata kerja formal bertumpuk di awal (misal: 'Melakukan melaksanakan...', 'Melaksanakan melakukan...')
+  cleaned = cleaned.replace(/^(Melakukan|Melaksanakan|Menyusun|Mengikuti|Menjalankan)\s+(melakukan|melaksanakan|menyusun|mengikuti|menjalankan)\b/gi, "$1");
+
+  // 3. Bersihkan konjungsi berulang (misal: 'serta serta...', 'dan dan...')
+  cleaned = cleaned.replace(/\b(serta|dan|lalu|kemudian)\s+\1\b/gi, "$1");
+
+  return cleaned.trim();
+}
+
+/**
  * Generator Heuristik Offline untuk Memoles Catatan Kasaran Pegawai
  */
 export function polishJournalOffline(rawText, rhkList = []) {
-  let text = (rawText || "").trim();
+  let text = cleanDuplicatePhrases((rawText || "").trim());
 
   // Daftar prefix baku agar tidak pernah terduplikasi jika tombol poles diklik berkali-kali
   const knownPrefixConfig = [
@@ -711,6 +750,9 @@ export function polishJournalOffline(rawText, rhkList = []) {
   } else {
     polishedAktivitas = formalPrefix;
   }
+
+  // Bersihkan kembali duplikasi dinamis sebelum difinalisasi
+  polishedAktivitas = cleanDuplicatePhrases(polishedAktivitas);
 
   // Rapikan huruf kapital di awal kalimat
   polishedAktivitas = polishedAktivitas.charAt(0).toUpperCase() + polishedAktivitas.slice(1);
