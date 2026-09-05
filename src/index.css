@@ -1083,11 +1083,11 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     font-family: 'Times New Roman', Times, serif !important;
   }
 
-  .no-print, .app-header, .ai-generator-box, .tabs-nav, .header-actions, .btn, .modal-overlay {
+  .no-print, .app-header, .ai-generator-box, .tabs-nav, .header-actions, .btn, .modal-overlay, .preview-only-link {
     display: none !important;
   }
 
-  .print-only {
+  .print-only, .print-only-text {
     display: block !important;
   }
 

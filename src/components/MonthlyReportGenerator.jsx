@@ -719,6 +719,7 @@ export default function MonthlyReportGenerator({
                             href={jrn.fileUrl || jrn.fotoUrl}
                             target="_blank"
                             rel="noreferrer"
+                            className="preview-only-link"
                             style={{ fontSize: "7pt", color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold", display: "inline-block" }}
                             title="Klik untuk membuka/melihat foto resolusi penuh"
                           >
@@ -735,10 +736,16 @@ export default function MonthlyReportGenerator({
                               📎 Lampiran {jrn.lampiranIndex}
                             </div>
                           )}
+                          {/* Saat Cetak: Tampilkan nama berkas tanpa hyperlink */}
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000" }}>
+                            {jrn.trackableName || jrn.fileName}
+                          </div>
+                          {/* Saat Preview Web: Tampilkan link berkas yang bisa diklik */}
                           <a 
                             href={jrn.fileUrl || (jrn.filePath ? `/uploads/${jrn.filePath.split(/[/\\]/).pop()}` : `/uploads/${jrn.fileName}`)}
                             target="_blank"
                             rel="noreferrer"
+                            className="preview-only-link"
                             style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold", display: "block", wordBreak: "break-all" }}
                             title={jrn.trackableName || jrn.fileName}
                           >
@@ -751,10 +758,16 @@ export default function MonthlyReportGenerator({
                       {/* 3. Tautan Online / Drive (jika bukan berkas upload, "kalau link baru link aja") */}
                       {(jrn.linkUrl && jrn.linkUrl !== jrn.fileUrl && !jrn.hasPhysical) ? (
                         <div style={{ marginTop: jrn.fotoUrl ? "4px" : "0", fontSize: "7.5pt", lineHeight: "1.25" }}>
+                          {/* Saat Cetak: Tampilkan keterangan teks tanpa tautan biru */}
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000" }}>
+                            Tautan Online Bukti Eviden
+                          </div>
+                          {/* Saat Preview Web: Tampilkan link */}
                           <a 
                             href={jrn.linkUrl || jrn.driveLink || jrn.link} 
                             target="_blank" 
                             rel="noreferrer" 
+                            className="preview-only-link"
                             style={{ 
                               color: "#1d4ed8", 
                               textDecoration: "underline", 
@@ -766,6 +779,7 @@ export default function MonthlyReportGenerator({
                             🔗 Tautan Online
                           </a>
                           <div 
+                            className="preview-only-link"
                             style={{ 
                               fontSize: "6.5pt", 
                               color: "#475569", 

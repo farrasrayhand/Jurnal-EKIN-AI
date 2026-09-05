@@ -567,6 +567,10 @@ export function polishJournalOffline(rawText, rhkList = []) {
     { prefix: "Melakukan monitoring, inspeksi berkala, dan evaluasi operasional", category: "monitoring" },
     { prefix: "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi", category: "pembelajaran" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula", category: "rapat" },
+    { prefix: "Mengikuti kegiatan sosialisasi, pendalaman materi kedinasan, serta pembahasan teknis", category: "sosialisasi" },
+    { prefix: "Mengikuti kegiatan sosialisasi, pendalaman materi, serta pembahasan teknis", category: "sosialisasi" },
+    { prefix: "Mengikuti kegiatan sosialisasi", category: "sosialisasi" },
+    { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula", category: "rapat" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta pembahasan teknis", category: "rapat" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data", category: "rekap" },
@@ -599,6 +603,9 @@ export function polishJournalOffline(rawText, rhkList = []) {
   // Deteksi Kategori Kegiatan secara Kontekstual & Akurat (Berdasarkan Word Boundaries)
   const isExplicitTeaching = /\b(mengajar|ngajar|kbm|jam pelajaran|pembelajaran di kelas|kegiatan belajar mengajar)\b/i.test(text);
 
+  const isSosialisasi = detectedCategory === "sosialisasi" ||
+    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi)\b/i.test(text);
+
   const isKearsipan = detectedCategory === "kearsipan" ||
     /\b(arsip|kearsipan|mengarsipkan|pengarsipan|mengarsip|ijazah|buku induk|lemari dokumen|lemari arsip|penataan berkas|simpan berkas|penyimpanan berkas|filling|map arsip)\b/i.test(text);
 
@@ -622,7 +629,7 @@ export function polishJournalOffline(rawText, rhkList = []) {
     /\b(rapat|koordinasi|briefing|notula|rapat dinas|sidang|audiensi)\b/i.test(text);
 
   const isPembelajaran = detectedCategory === "pembelajaran" || isExplicitTeaching ||
-    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap);
+    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap && !isSosialisasi);
 
   const isDokumen = detectedCategory === "dokumen" ||
     /\b(bikin laporan|buat laporan|susun laporan|draf|draft|penyusunan dokumen|sk pembagian tugas|jadwal kegiatan)\b/i.test(text);
@@ -635,7 +642,15 @@ export function polishJournalOffline(rawText, rhkList = []) {
   let output = "1 Laporan Pelaksanaan Tugas";
   let catatan = "Kegiatan terselesaikan dengan tertib dan memenuhi standar pelayanan.";
 
-  if (isKearsipan) {
+  if (isExplicitTeaching) {
+    formalPrefix = "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi";
+    output = "1 Jurnal Pembelajaran & Daftar Hadir";
+    catatan = "Kegiatan belajar mengajar berlangsung interaktif dan seluruh capaian materi terpenuhi baik.";
+  } else if (isSosialisasi) {
+    formalPrefix = "Mengikuti kegiatan sosialisasi, pendalaman materi kedinasan, serta pembahasan teknis";
+    output = "1 Sertifikat / Surat Tugas / Laporan Kegiatan";
+    catatan = "Kegiatan sosialisasi diikuti secara aktif dan materi terserap optimal guna kelancaran pelaksanaan tugas kedinasan.";
+  } else if (isKearsipan) {
     formalPrefix = "Melakukan penataan, klasifikasi, serta penyimpanan";
     output = "1 Berkas Pengelolaan Arsip Dokumen";
     catatan = "Berkas dokumen telah diverifikasi, tersusun secara sistematis, dan disimpan aman pada lemari arsip sesuai klasifikasi.";
@@ -680,6 +695,7 @@ export function polishJournalOffline(rawText, rhkList = []) {
   // Bersihkan kata percakapan santai & kata kerja kasaran
   let cleanedSubject = text
     .replace(/^(tadi|hari ini|udah|sudah|lagi|sedang|mau|pengen|aku|saya|kita|kami)\s+/gi, "")
+    .replace(/^(mengikuti|ngikut|ikut|hadir|menghadiri)\s+/gi, "")
     .replace(/^(ngerekap|rekap|input|menginput|penginputan|entri|mengentri)\s+/gi, "")
     .replace(/^(arsip|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
     .replace(/^(benerin|perbaiki|memperbaiki|beneri)\s+/gi, "")
@@ -707,7 +723,10 @@ export function polishJournalOffline(rawText, rhkList = []) {
   // Rangkai kalimat formal tanpa redundansi
   let polishedAktivitas = "";
   if (cleanedSubject) {
-    if (isKearsipan && !cleanedSubject.toLowerCase().startsWith("dokumen") && !cleanedSubject.toLowerCase().startsWith("berkas")) {
+    if (isSosialisasi) {
+      const topic = cleanedSubject.replace(/^(sosialisasi|kegiatan sosialisasi|bimtek|workshop|pelatihan)\s*/gi, "").trim();
+      polishedAktivitas = topic ? `${formalPrefix} terkait ${topic}` : formalPrefix;
+    } else if (isKearsipan && !cleanedSubject.toLowerCase().startsWith("dokumen") && !cleanedSubject.toLowerCase().startsWith("berkas")) {
       polishedAktivitas = `${formalPrefix} dokumen ${cleanedSubject}`;
     } else {
       polishedAktivitas = `${formalPrefix} ${cleanedSubject}`;

@@ -344,26 +344,25 @@ export function generateMonthlyReportPdf({
               if (imgSource) {
                 try { doc.image(imgSource, col5X + 3, tableY + 4, { fit: [col5W - 6, 30], align: "center", valign: "center" }); renderedThumb = true; } catch (e) { renderedThumb = false; }
               }
-              const labelY = renderedThumb ? tableY + 36 : tableY + 6;
+              const labelY = renderedThumb ? tableY + 36 : tableY + 8;
               doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7);
               doc.text(`📎 ${jrn.lampiranLabel}`, col5X, labelY, { width: col5W, align: "center" });
-              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
-              doc.text(totalAttCount > 1 ? `🔗 Buka ${totalAttCount} Berkas` : "🔗 Buka Foto", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
             } else {
               doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7.5);
               doc.text(`📎 ${jrn.lampiranLabel}`, col5X, tableY + 6, { width: col5W, align: "center" });
-              const shortTrackName = (jrn.trackableName || jrn.fileName || "berkas.pdf").slice(0, 18);
+              const shortTrackName = (jrn.trackableName || jrn.fileName || "berkas.pdf").slice(0, 24);
               doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
-              doc.text(shortTrackName, col5X, doc.y + 1, { width: col5W, align: "center" });
-              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6.5);
-              doc.text(totalAttCount > 1 ? `🔗 Buka ${totalAttCount} Berkas` : "🔗 Buka Berkas", col5X, doc.y + 1, { width: col5W, align: "center", link: primaryLink, underline: true });
+              doc.text(shortTrackName, col5X, doc.y + 2, { width: col5W, align: "center" });
             }
           } else {
             const hasCustomLink = Boolean(jrn.linkUrl);
-            doc.fillColor("#1d4ed8").font("Times-Bold").fontSize(7.5);
-            doc.text(hasCustomLink ? "🔗 Tautan Online" : "🔗 Tautan Drive", col5X, tableY + 8, { width: col5W, align: "center", link: primaryLink, underline: true });
-            doc.fillColor("#64748b").font("Times-Roman").fontSize(6.5);
-            doc.text("Tautan Bukti Eviden", col5X, doc.y + 2, { width: col5W, align: "center" });
+            if (hasCustomLink) {
+              doc.fillColor("#475569").font("Times-Roman").fontSize(7);
+              doc.text("Tautan Bukti Eviden", col5X, tableY + 8, { width: col5W, align: "center" });
+            } else {
+              doc.fillColor("#94a3b8").font("Times-Italic").fontSize(7);
+              doc.text("-", col5X, tableY + 8, { width: col5W, align: "center" });
+            }
           }
           tableY += rowH;
         });

@@ -793,6 +793,23 @@ export default function JournalSection({
             </div>
           </div>
 
+          {/* Catatan / Keterangan Tambahan */}
+          <div className="form-group" style={{ marginBottom: "1rem" }}>
+            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "0.3rem", fontWeight: "600" }}>
+              <FileText size={13} /> Catatan / Keterangan Tambahan (Opsional):
+            </label>
+            <input 
+              type="text" 
+              className="input-field"
+              value={formData.catatan || ""}
+              onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
+              placeholder="Contoh: Disertai foto dokumentasi fisik lapangan, atau catatan kualitatif hasil kegiatan..."
+            />
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "3px", display: "block" }}>
+              💡 Catatan ini akan dicantumkan di bawah uraian kegiatan pada laporan bulanan & PDF (otomatis terisi saat dipoles AI).
+            </span>
+          </div>
+
           {/* Grid Dua Kolom: Unggah Berkas & Tautan Online */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem", marginBottom: "1.25rem" }}>
             {/* Kolom 1: Upload File Bukti (Foto atau Dokumen PDF/Word/Excel) */}
@@ -1077,6 +1094,17 @@ export default function JournalSection({
                   }}>
                     {j.aktivitas}
                   </p>
+                  {j.catatan && (
+                    <p style={{
+                      fontSize: "0.78rem",
+                      fontStyle: "italic",
+                      color: "var(--text-secondary)",
+                      margin: "3px 0 0 0",
+                      lineHeight: "1.35"
+                    }}>
+                      Catatan: {j.catatan}
+                    </p>
+                  )}
 
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginTop: "4px" }}>
                     {j.outputJumlah && (

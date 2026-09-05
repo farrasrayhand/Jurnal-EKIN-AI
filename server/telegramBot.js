@@ -2240,11 +2240,28 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       const monthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
 
       try {
-        const rawDl = await bot.downloadFile(bestPhoto.file_id, UPLOADS_DIR);
-        if (rawDl && fs.existsSync(rawDl)) {
+        let downloadedPath = "";
+        try {
+          downloadedPath = await bot.downloadFile(bestPhoto.file_id, UPLOADS_DIR);
+        } catch (e1) {
+          try {
+            const fileLink = await bot.getFileLink(bestPhoto.file_id);
+            const resp = await fetch(fileLink);
+            if (resp.ok) {
+              const buf = Buffer.from(await resp.arrayBuffer());
+              const tempName = `temp_${Date.now()}_${bestPhoto.file_id.slice(-6)}.jpg`;
+              downloadedPath = path.join(UPLOADS_DIR, tempName);
+              fs.writeFileSync(downloadedPath, buf);
+            }
+          } catch (e2) {
+            console.warn("Gagal download via direct file link:", e2.message);
+          }
+        }
+
+        if (downloadedPath && fs.existsSync(downloadedPath)) {
           const newPhotoName = `Foto_${monthTag}_${Date.now()}_${crypto.randomBytes(3).toString("hex")}.jpg`;
           const newPath = path.join(UPLOADS_DIR, newPhotoName);
-          fs.renameSync(rawDl, newPath);
+          fs.renameSync(downloadedPath, newPath);
           savedFilePath = newPath;
         }
       } catch (dlErr) {
@@ -2300,11 +2317,28 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       let savedFilePath = "";
 
       try {
-        const rawDl = await bot.downloadFile(doc.file_id, UPLOADS_DIR);
-        if (rawDl && fs.existsSync(rawDl)) {
+        let downloadedPath = "";
+        try {
+          downloadedPath = await bot.downloadFile(doc.file_id, UPLOADS_DIR);
+        } catch (e1) {
+          try {
+            const fileLink = await bot.getFileLink(doc.file_id);
+            const resp = await fetch(fileLink);
+            if (resp.ok) {
+              const buf = Buffer.from(await resp.arrayBuffer());
+              const tempName = `temp_${Date.now()}_${doc.file_id.slice(-6)}_${cleanFileName}`;
+              downloadedPath = path.join(UPLOADS_DIR, tempName);
+              fs.writeFileSync(downloadedPath, buf);
+            }
+          } catch (e2) {
+            console.warn("Gagal download dokumen via direct file link:", e2.message);
+          }
+        }
+
+        if (downloadedPath && fs.existsSync(downloadedPath)) {
           const newStoredName = `${Date.now()}_${docFileName}`;
           const newPath = path.join(UPLOADS_DIR, newStoredName);
-          fs.renameSync(rawDl, newPath);
+          fs.renameSync(downloadedPath, newPath);
           savedFilePath = newPath;
         }
       } catch (dlErr) {
