@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { 
   BookOpen, Plus, Camera, Trash2, Sparkles, 
   Calendar, Clock, CheckCircle2, FileText, ExternalLink, 
-  X, ZoomIn, Paperclip, FileSpreadsheet, Link2, Briefcase
+  X, ZoomIn, Paperclip, FileSpreadsheet, Link2, Briefcase, Edit3
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { processEvidenceFile } from "../utils/fileUtils";
@@ -24,6 +24,8 @@ export default function JournalSection({
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isPolishing, setIsPolishing] = useState(false);
   const [isPolished, setIsPolished] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const formContainerRef = useRef(null);
   const [originalKasaran, setOriginalKasaran] = useState("");
   const [selectedJabatanOverride, setSelectedJabatanOverride] = useState("");
 
@@ -198,26 +200,7 @@ export default function JournalSection({
     }));
   };
 
-  const handleSaveJournal = (e) => {
-    e.preventDefault();
-    if (!formData.aktivitas.trim()) {
-      alert("Harap masukkan uraian aktivitas kerja!");
-      return;
-    }
-
-    const activeUserId = currentUser?.id || (currentUser?.username ? `usr-${currentUser.username}` : "usr-farras");
-    const activeUsername = currentUser?.username || "farras";
-
-    const newEntry = {
-      ...formData,
-      id: `jrn-${Date.now()}`,
-      userId: activeUserId,
-      username: activeUsername,
-      aktivitasKasaran: originalKasaran || formData.aktivitas
-    };
-
-    setJournals([newEntry, ...journals]);
-    setOriginalKasaran("");
+  const resetForm = () => {
     setFormData({
       tanggal: new Date().toISOString().slice(0, 10),
       jam: "08:00 - 12:00",
@@ -235,6 +218,96 @@ export default function JournalSection({
       fileUrl: "",
       linkUrl: ""
     });
+    setOriginalKasaran("");
+    setEditingId(null);
+    setIsPolished(false);
+  };
+
+  const handleEditJournal = (j) => {
+    setEditingId(j.id);
+    const existingAttachments = Array.isArray(j.attachments) && j.attachments.length > 0
+      ? j.attachments
+      : (j.fotoUrl || j.fileName ? [{
+          id: `att-${Date.now()}`,
+          type: j.evidenceType || (j.fotoUrl ? "image" : "document"),
+          docCategory: j.docCategory || (j.fotoUrl ? "image" : "pdf"),
+          fileName: j.fileName || (j.fotoUrl ? "Foto Bukti" : "Dokumen Bukti"),
+          storedName: j.storedName || "",
+          fileSize: j.fileSize || "",
+          fotoUrl: j.fotoUrl || "",
+          fileUrl: j.fileUrl || ""
+        }] : []);
+
+    const firstAtt = existingAttachments[0];
+
+    setFormData({
+      tanggal: j.tanggal || new Date().toISOString().slice(0, 10),
+      jam: j.jam || "08:00 - 12:00",
+      aktivitas: j.aktivitas || "",
+      outputJumlah: j.outputJumlah || "1 Dokumen / Kegiatan",
+      rhkId: j.rhkId || (rhkList[0]?.id || ""),
+      catatan: j.catatan || "",
+      attachments: existingAttachments,
+      evidenceType: firstAtt ? firstAtt.type : (j.evidenceType || "none"),
+      docCategory: firstAtt ? firstAtt.docCategory : (j.docCategory || "pdf"),
+      fileName: firstAtt ? firstAtt.fileName : (j.fileName || ""),
+      storedName: firstAtt ? firstAtt.storedName : (j.storedName || ""),
+      fileSize: firstAtt ? firstAtt.fileSize : (j.fileSize || ""),
+      fotoUrl: firstAtt ? firstAtt.fotoUrl : (j.fotoUrl || ""),
+      fileUrl: firstAtt ? firstAtt.fileUrl : (j.fileUrl || ""),
+      linkUrl: j.linkUrl || ""
+    });
+
+    setOriginalKasaran(j.aktivitasKasaran || j.aktivitas || "");
+    setIsPolished(true);
+    setIsFormOpen(true);
+
+    setTimeout(() => {
+      if (formContainerRef.current) {
+        formContainerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 60);
+  };
+
+  const handleSaveJournal = (e) => {
+    e.preventDefault();
+    if (!formData.aktivitas.trim()) {
+      alert("Harap masukkan uraian aktivitas kerja!");
+      return;
+    }
+
+    if (editingId) {
+      setJournals(prev => prev.map(item => {
+        if (item.id === editingId) {
+          return {
+            ...item,
+            ...formData,
+            aktivitasKasaran: originalKasaran || formData.aktivitas,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return item;
+      }));
+      resetForm();
+      setIsFormOpen(false);
+      setNotification("✅ Catatan aktivitas berhasil diperbarui!");
+      setTimeout(() => setNotification(""), 3500);
+      return;
+    }
+
+    const activeUserId = currentUser?.id || (currentUser?.username ? `usr-${currentUser.username}` : "usr-farras");
+    const activeUsername = currentUser?.username || "farras";
+
+    const newEntry = {
+      ...formData,
+      id: `jrn-${Date.now()}`,
+      userId: activeUserId,
+      username: activeUsername,
+      aktivitasKasaran: originalKasaran || formData.aktivitas
+    };
+
+    setJournals([newEntry, ...journals]);
+    resetForm();
     setIsFormOpen(false);
 
     setNotification("Catatan aktivitas & bukti hasil kerja berhasil disimpan ke logbook!");
@@ -253,8 +326,9 @@ export default function JournalSection({
       if (!originalKasaran) {
         setOriginalKasaran(formData.aktivitas);
       }
+      const textToPolish = originalKasaran || formData.aktivitas;
       const result = await polishJournalWithAi({
-        rawText: formData.aktivitas,
+        rawText: textToPolish,
         rhkList,
         apiKey: geminiApiKey,
         jabatan: pegawai?.jabatan,
@@ -305,6 +379,9 @@ export default function JournalSection({
         console.warn("Peringatan saat menghapus jurnal di backend:", err.message);
       }
       setJournals(prev => prev.filter(j => j.id !== id));
+      if (editingId === id) {
+        resetForm();
+      }
       setNotification("Catatan aktivitas dan seluruh berkas fisik lampiran terkait berhasil dihapus bersih.");
       setTimeout(() => setNotification(""), 3500);
     }
@@ -410,22 +487,24 @@ export default function JournalSection({
       {/* Form Input Catatan Kasar & AI Polisher */}
       {isFormOpen && (
         <form 
+          ref={formContainerRef}
           onSubmit={handleSaveJournal}
           style={{
             marginBottom: "1.75rem",
             padding: "1.25rem",
             background: "var(--bg-tertiary)",
-            border: "1px solid var(--border-subtle)",
-            borderRadius: "var(--radius-lg)"
+            border: editingId ? "1.5px solid var(--accent-primary, #2563eb)" : "1px solid var(--border-subtle)",
+            borderRadius: "var(--radius-lg)",
+            boxShadow: editingId ? "0 0 0 3px rgba(37, 99, 235, 0.15)" : "none"
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <h3 style={{ fontSize: "0.95rem", fontWeight: "700", color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-              <Sparkles size={16} className="text-amber-500" />
-              <span>Tulis Catatan Kerja Kasaran &amp; Poles dengan AI</span>
+            <h3 style={{ fontSize: "0.95rem", fontWeight: "700", color: editingId ? "var(--accent-primary, #2563eb)" : "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              {editingId ? <Edit3 size={16} className="text-blue-500" /> : <Sparkles size={16} className="text-amber-500" />}
+              <span>{editingId ? "Edit Catatan Aktivitas Kerja" : "Tulis Catatan Kerja Kasaran & Poles dengan AI"}</span>
             </h3>
             <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              Ketik bahasa santai &rarr; Klik tombol poles &rarr; Simpan ke laporan
+              {editingId ? "Perbarui isi uraian, tanggal, lampiran, atau link lalu simpan perubahan" : "Ketik bahasa santai → Klik tombol poles → Simpan ke laporan"}
             </span>
           </div>
 
@@ -820,12 +899,15 @@ export default function JournalSection({
             <button 
               type="button" 
               className="btn btn-secondary btn-sm"
-              onClick={() => setIsFormOpen(false)}
+              onClick={() => {
+                resetForm();
+                setIsFormOpen(false);
+              }}
             >
-              Batal
+              {editingId ? "Batal Edit" : "Batal"}
             </button>
             <button type="submit" className="btn btn-primary btn-sm">
-              <CheckCircle2 size={14} /> Simpan Catatan & Bukti Kerja
+              <CheckCircle2 size={14} /> {editingId ? "Simpan Perubahan Catatan" : "Simpan Catatan & Bukti Kerja"}
             </button>
           </div>
         </form>
@@ -869,8 +951,8 @@ export default function JournalSection({
               <div 
                 key={j.id || index}
                 style={{
-                  background: "var(--bg-secondary)",
-                  border: "1px solid var(--border-subtle)",
+                  background: editingId === j.id ? "rgba(37, 99, 235, 0.06)" : "var(--bg-secondary)",
+                  border: editingId === j.id ? "1.5px solid var(--accent-primary, #2563eb)" : "1px solid var(--border-subtle)",
                   borderRadius: "var(--radius-md)",
                   padding: "0.75rem 1rem",
                   display: "flex",
@@ -1029,6 +1111,23 @@ export default function JournalSection({
                       <ZoomIn size={14} />
                     </button>
                   )}
+
+                  <button 
+                    type="button"
+                    className="btn btn-outline btn-icon btn-sm"
+                    onClick={() => handleEditJournal(j)}
+                    style={{ 
+                      color: "var(--accent-primary, #2563eb)", 
+                      borderColor: editingId === j.id ? "var(--accent-primary, #2563eb)" : "var(--border-subtle)",
+                      background: editingId === j.id ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                      width: "30px", 
+                      height: "30px", 
+                      padding: 0 
+                    }}
+                    title="Edit catatan aktivitas ini"
+                  >
+                    <Edit3 size={14} />
+                  </button>
 
                   <button 
                     type="button"
