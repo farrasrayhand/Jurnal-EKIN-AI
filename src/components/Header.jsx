@@ -10,7 +10,8 @@ import {
   LogOut,
   ChevronDown,
   Database,
-  Send
+  Send,
+  RefreshCw
 } from "lucide-react";
 
 export default function Header({
@@ -25,7 +26,9 @@ export default function Header({
   onOpenAccountManagerModal,
   onLogout,
   apiKeyInfo = { key: "", source: "none", label: "Mode Offline" },
-  botConfig = { enabled: false, username: "" }
+  botConfig = { enabled: false, username: "" },
+  isSyncing = false,
+  onRefreshSync = null
 }) {
   const activeKeyInfo = apiKeyInfo || { key: "", source: "none", label: "Mode Offline" };
   const fileInputRef = useRef(null);
@@ -180,6 +183,24 @@ export default function Header({
                     <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Simpan data ke file .json</div>
                   </div>
                 </button>
+
+                {onRefreshSync && (
+                  <button 
+                    type="button"
+                    className="nav-dropdown-item"
+                    onClick={() => {
+                      setIsDataMenuOpen(false);
+                      onRefreshSync();
+                    }}
+                    title="Sinkronkan data logbook dengan Telegram Bot & Database Server"
+                  >
+                    <RefreshCw size={15} className={isSyncing ? "animate-spin" : ""} style={{ color: "#0284c7", flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: "700" }}>{isSyncing ? "Menyinkronkan..." : "Sinkronkan Sekarang"}</div>
+                      <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>Ambil jurnal Telegram & DB</div>
+                    </div>
+                  </button>
+                )}
 
                 <button 
                   type="button"

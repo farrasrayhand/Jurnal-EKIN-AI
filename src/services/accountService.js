@@ -230,13 +230,13 @@ export async function syncWithBackend() {
         });
         const merged = Array.from(map.values());
         localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(merged));
-        return {
-          accounts: merged,
-          journals: data.journals || [],
-          settings: data.settings || {},
-          botConfig: cachedBotConfig
-        };
       }
+      return {
+        accounts: getAccounts(),
+        journals: Array.isArray(data?.journals) ? data.journals : [],
+        settings: data?.settings || {},
+        botConfig: cachedBotConfig
+      };
     }
   } catch (e) {
     // Mode offline / static, abaikan

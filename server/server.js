@@ -118,7 +118,7 @@ import("./telegramBot.js")
   });
 
 // 2. Buat HTTP Server untuk Web App & API Sync yang Aman
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // Pasang security headers di setiap respons
   setSecurityHeaders(res);
 
@@ -601,13 +601,35 @@ const server = http.createServer((req, res) => {
 
     if (req.method === "GET") {
       res.setHeader("Content-Type", "application/json");
+
+      // Jika database aktif (MySQL / PostgreSQL), muat data terbaru dari DB
+      if (getActiveDbType() !== "json") {
+        try {
+          const remoteStore = await loadStoreFromDatabase();
+          if (remoteStore) {
+            setCachedStore(remoteStore);
+            try {
+              fs.writeFileSync(DB_FILE, JSON.stringify(remoteStore, null, 2), "utf8");
+            } catch (e) {}
+          }
+        } catch (dbErr) {
+          console.warn("Sinkronisasi database aktif ke store gagal (menggunakan cache):", dbErr.message);
+        }
+      }
+
       const store = getStore();
       const accounts = (store.accounts || []).map(sanitizeUser);
-      const journals = store.journals || [];
+      // Urutkan selalu secara kronologis menurun (paling baru di atas)
+      const journals = [...(store.journals || [])].sort((a, b) => {
+        const diffDate = String(b.tanggal || "").localeCompare(String(a.tanggal || ""));
+        if (diffDate !== 0) return diffDate;
+        return String(b.createdAt || b.id || "").localeCompare(String(a.createdAt || a.id || ""));
+      });
       res.end(JSON.stringify({
         accounts,
         journals,
-        botConfig: getBotConfig()
+        botConfig: getBotConfig(),
+        timestamp: new Date().toISOString()
       }));
       return;
     } else if (req.method === "POST") {

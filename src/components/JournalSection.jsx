@@ -2,7 +2,8 @@ import React, { useState, useRef } from "react";
 import { 
   BookOpen, Plus, Camera, Trash2, Sparkles, 
   Calendar, Clock, CheckCircle2, FileText, ExternalLink, 
-  X, ZoomIn, Paperclip, FileSpreadsheet, Link2, Briefcase, Edit3
+  X, ZoomIn, Paperclip, FileSpreadsheet, Link2, Briefcase, Edit3,
+  RefreshCw
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { processEvidenceFile } from "../utils/fileUtils";
@@ -19,7 +20,10 @@ export default function JournalSection({
   pegawai,
   geminiApiKey,
   apiKeyInfo = { key: "", source: "none" },
-  currentUser
+  currentUser,
+  isSyncing = false,
+  onRefreshSync = null,
+  lastSyncTime = null
 }) {
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [isPolishing, setIsPolishing] = useState(false);
@@ -436,6 +440,29 @@ export default function JournalSection({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+          {onRefreshSync && (
+            <button 
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "0.35rem",
+                cursor: isSyncing ? "wait" : "pointer"
+              }}
+              onClick={async () => {
+                await onRefreshSync();
+                setNotification("✅ Data logbook berhasil disinkronkan dengan Telegram & Database!");
+                setTimeout(() => setNotification(""), 3500);
+              }}
+              disabled={isSyncing}
+              title="Sinkronkan data terkini dari Telegram Bot & Database Server"
+            >
+              <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+              <span>{isSyncing ? "Menyinkronkan..." : "Sinkronkan Data"}</span>
+            </button>
+          )}
+
           <button 
             type="button"
             className="btn btn-sm"

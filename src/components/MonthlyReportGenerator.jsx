@@ -30,8 +30,8 @@ export default function MonthlyReportGenerator({
   pendekatan = "KUANTITATIF",
   onSyncLinkToRhk
 }) {
-  const [selectedMonth, setSelectedMonth] = useState("07"); // Default Juli sesuai screenshot
-  const [selectedYear, setSelectedYear] = useState("2026");
+  const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, "0"));
+  const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
   const [copiedNarasi, setCopiedNarasi] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const EXAMPLE_GDRIVE_LINK = "https://drive.google.com/drive/folders/13gAIC8Nm4kHqjxlAETxcx6km4m5ZUThz";

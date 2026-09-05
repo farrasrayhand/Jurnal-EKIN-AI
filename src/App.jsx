@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Header from "./components/Header";
 import HomeSection from "./components/HomeSection";
 import JournalSection from "./components/JournalSection";
@@ -41,27 +41,114 @@ export default function App() {
     localStorage.setItem("ekinerja_theme", theme);
   }, [theme]);
 
-  // Inisialisasi Database Akun & Sinkronisasi dengan Backend Store (Telegram Bot)
+  // Data Jurnal Harian & Bukti Foto Kerja (Dimulai bersih dari kosong)
+  const [journals, setJournals] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ekinerja_journals");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Hapus otomatis item demo lama jika ada
+        const userItems = parsed.filter(j => !j.id?.toString().startsWith("demo-") && !j.id?.toString().startsWith("jrn-smk-"));
+        return userItems;
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const isRemoteSyncRef = useRef(false);
+
+  // Fungsi Sinkronisasi Aktif (Server Database, Telegram Bot & Web LocalStorage)
+  const fetchAndSyncJournals = useCallback(async (isManual = false) => {
+    try {
+      setIsSyncing(true);
+      const res = await syncWithBackend();
+      if (res) {
+        if (res.botConfig) {
+          setBotConfig(res.botConfig);
+        }
+        if (Array.isArray(res.journals)) {
+          isRemoteSyncRef.current = true;
+          setJournals(prev => {
+            const map = new Map();
+            // 1. Masukkan seluruh jurnal dari server backend (authoritative source)
+            res.journals.forEach(j => {
+              if (j && j.id) map.set(j.id, j);
+            });
+            // 2. Pertahankan entri lokal yang belum sempat ter-push
+            prev.forEach(j => {
+              if (j && j.id && !map.has(j.id)) {
+                map.set(j.id, j);
+              }
+            });
+            // 3. Urutkan secara kronologis terbalik (tanggal terbaru & createdAt terbaru selalu di atas)
+            const sorted = Array.from(map.values()).sort((a, b) => {
+              const diffDate = String(b.tanggal || "").localeCompare(String(a.tanggal || ""));
+              if (diffDate !== 0) return diffDate;
+              return String(b.createdAt || b.id || "").localeCompare(String(a.createdAt || a.id || ""));
+            });
+            try {
+              localStorage.setItem("ekinerja_journals", JSON.stringify(sorted));
+            } catch (e) {}
+            return sorted;
+          });
+        }
+        setLastSyncTime(new Date());
+      }
+    } catch (e) {
+      console.warn("Sinkronisasi jurnal latar belakang tertunda:", e?.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // Simpan ke localStorage & push ke backend saat jurnal diubah oleh pengguna web
+  useEffect(() => {
+    try {
+      localStorage.setItem("ekinerja_journals", JSON.stringify(journals));
+      if (isRemoteSyncRef.current) {
+        isRemoteSyncRef.current = false;
+        return;
+      }
+      pushSyncToBackend({ journals });
+    } catch (e) {}
+  }, [journals]);
+
+  // Inisialisasi Database Akun & Sinkronisasi Awal dengan Backend Store (Telegram Bot)
   useEffect(() => {
     initAccountDatabase();
     fetchTelegramBotStatus().then(cfg => {
       if (cfg) setBotConfig(cfg);
     });
-    syncWithBackend().then(res => {
-      if (res && res.botConfig) {
-        setBotConfig(res.botConfig);
+    fetchAndSyncJournals();
+  }, [fetchAndSyncJournals]);
+
+  // Sinkronisasi Otomatis saat Window Mendapat Fokus Kembali (User balik dari Telegram Desktop / HP)
+  useEffect(() => {
+    const handleFocus = () => fetchAndSyncJournals();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchAndSyncJournals();
       }
-      if (res && Array.isArray(res.journals) && res.journals.length > 0) {
-        setJournals(prev => {
-          const map = new Map(prev.map(j => [j.id, j]));
-          res.journals.forEach(j => {
-            if (!map.has(j.id)) map.set(j.id, j);
-          });
-          return Array.from(map.values());
-        });
-      }
-    });
-  }, []);
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchAndSyncJournals]);
+
+  // Polling Latar Belakang Setiap 12 Detik Agar Jurnal Telegram Otomatis Muncul Tanpa Refresh
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAndSyncJournals();
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [fetchAndSyncJournals]);
 
   // Verifikasi keabsahan session aktif (1 hari / 24 jam) ke backend di latar belakang
   useEffect(() => {
@@ -109,10 +196,11 @@ export default function App() {
   // Tab State: "home" | "jurnal" | "laporan"
   const [activeTab, setActiveTab] = useState(getTabFromHash);
 
-  // Navigasi Tab dengan Sinkronisasi URL Hash di Browser
+  // Navigasi Tab dengan Sinkronisasi URL Hash & Auto-Refresh Data
   const navigateToTab = (tab) => {
     setActiveTab(tab);
     window.location.hash = `#/${tab}`;
+    fetchAndSyncJournals();
   };
 
   // Sinkronisasi dengan tombol Back/Forward browser dan perubahan URL langsung
@@ -171,6 +259,7 @@ export default function App() {
   const handleUserChanged = (user) => {
     setCurrentUserState(user);
     saveCurrentUser(user);
+    fetchAndSyncJournals();
     if (user) {
       setPegawai({
         nama: user.nama || "",
@@ -204,28 +293,7 @@ export default function App() {
     } catch (e) {}
   }, [pegawai]);
 
-  // Data Jurnal Harian & Bukti Foto Kerja (Dimulai bersih dari kosong)
-  const [journals, setJournals] = useState(() => {
-    try {
-      const saved = localStorage.getItem("ekinerja_journals");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Hapus otomatis item demo lama jika ada
-        const userItems = parsed.filter(j => !j.id?.toString().startsWith("demo-") && !j.id?.toString().startsWith("jrn-smk-"));
-        return userItems;
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("ekinerja_journals", JSON.stringify(journals));
-      pushSyncToBackend({ journals });
-    } catch (e) {}
-  }, [journals]);
 
   // Setting Izin API Key .env oleh Superadmin
   const [allowEnvKey, setAllowEnvKeyState] = useState(() => getAllowEnvKeySetting());
@@ -314,6 +382,8 @@ export default function App() {
         onLogout={handleLogout}
         apiKeyInfo={effectiveApiKeyInfo}
         botConfig={botConfig}
+        isSyncing={isSyncing}
+        onRefreshSync={() => fetchAndSyncJournals(true)}
       />
 
       {/* Tab Navigation dengan URL Hash */}
@@ -371,6 +441,9 @@ export default function App() {
           geminiApiKey={activeGeminiKey}
           apiKeyInfo={effectiveApiKeyInfo}
           currentUser={currentUser}
+          isSyncing={isSyncing}
+          onRefreshSync={() => fetchAndSyncJournals(true)}
+          lastSyncTime={lastSyncTime}
         />
       )}
 

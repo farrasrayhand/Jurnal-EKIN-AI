@@ -645,9 +645,10 @@ export function addJournal(journalData) {
   // Isi fallback field legacy dari lampiran pertama untuk kompatibilitas penuh
   const firstAtt = attachments[0] || null;
   const legacyFotoPath = journalData.fotoPath || (firstAtt && firstAtt.type === "image" ? firstAtt.filePath : "");
+  const legacyFotoUrl = journalData.fotoUrl || (firstAtt && firstAtt.type === "image" ? (firstAtt.fileUrl || firstAtt.fotoUrl || "") : "");
   const legacyFilePath = journalData.filePath || (firstAtt && firstAtt.type !== "image" ? firstAtt.filePath : "");
   const legacyFileName = journalData.fileName || (firstAtt ? firstAtt.fileName : "");
-  const legacyFileUrl = journalData.fileUrl || (firstAtt ? firstAtt.fileUrl : "");
+  const legacyFileUrl = journalData.fileUrl || (firstAtt ? (firstAtt.fileUrl || firstAtt.fotoUrl || "") : "");
   const legacyEvidenceType = journalData.evidenceType || (firstAtt ? firstAtt.type : (attachments.length > 0 ? "document" : "none"));
 
   const newEntry = {
@@ -656,6 +657,7 @@ export function addJournal(journalData) {
     ...journalData,
     attachments,
     fotoPath: legacyFotoPath,
+    fotoUrl: legacyFotoUrl,
     filePath: legacyFilePath,
     fileName: legacyFileName,
     fileUrl: legacyFileUrl,
