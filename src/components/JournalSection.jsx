@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { 
-  BookOpen, Plus, Camera, Trash2, Sparkles, 
+  BookOpen, Plus, PlusCircle, Camera, Trash2, Sparkles, 
   Calendar, Clock, CheckCircle2, FileText, ExternalLink, 
   X, ZoomIn, Paperclip, FileSpreadsheet, Link2, Briefcase, Edit3,
   RefreshCw
@@ -225,6 +225,18 @@ export default function JournalSection({
     setOriginalKasaran("");
     setEditingId(null);
     setIsPolished(false);
+  };
+
+  const handleStartNewJournal = () => {
+    resetForm();
+    setIsFormOpen(true);
+    setNotification("✨ Formulir siap untuk menambah jurnal baru.");
+    setTimeout(() => setNotification(""), 3000);
+    setTimeout(() => {
+      if (formContainerRef.current) {
+        formContainerRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 60);
   };
 
   const handleEditJournal = (j) => {
@@ -484,11 +496,32 @@ export default function JournalSection({
           </button>
 
           <button 
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: !editingId && isFormOpen ? "#059669" : "#10b981",
+              color: "#ffffff",
+              border: "none",
+              fontWeight: "700",
+              boxShadow: "0 2px 6px rgba(16, 185, 129, 0.25)",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.35rem"
+            }}
+            onClick={handleStartNewJournal}
+            title="Buka formulir untuk menambah catatan kegiatan baru"
+          >
+            <PlusCircle size={14} />
+            <span>+ Tambah Jurnal Baru</span>
+          </button>
+
+          <button 
+            type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => setIsFormOpen(!isFormOpen)}
+            title={isFormOpen ? "Sembunyikan formulir input" : "Buka formulir input"}
           >
-            <Plus size={14} />
-            <span>{isFormOpen ? "Sembunyikan Form" : "Buka Form Catatan"}</span>
+            <span>{isFormOpen ? "Tutup Form" : "Buka Form"}</span>
           </button>
         </div>
       </div>
@@ -520,11 +553,93 @@ export default function JournalSection({
             marginBottom: "1.75rem",
             padding: "1.25rem",
             background: "var(--bg-tertiary)",
-            border: editingId ? "1.5px solid var(--accent-primary, #2563eb)" : "1px solid var(--border-subtle)",
+            border: editingId ? "2px solid var(--accent-primary, #2563eb)" : "1.5px solid #10b981",
             borderRadius: "var(--radius-lg)",
-            boxShadow: editingId ? "0 0 0 3px rgba(37, 99, 235, 0.15)" : "none"
+            boxShadow: editingId ? "0 0 0 4px rgba(37, 99, 235, 0.15)" : "0 0 0 3px rgba(16, 185, 129, 0.1)"
           }}
         >
+          {/* Status Mode Banner: Edit vs Tambah */}
+          {editingId ? (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "rgba(37, 99, 235, 0.08)",
+              border: "1px solid #3b82f6",
+              borderRadius: "var(--radius-md)",
+              padding: "0.6rem 0.85rem",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.5rem"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  padding: "3px 8px",
+                  borderRadius: "4px",
+                  fontSize: "0.72rem",
+                  fontWeight: "800",
+                  letterSpacing: "0.5px"
+                }}>
+                  MODE EDIT
+                </span>
+                <span style={{ fontSize: "0.84rem", fontWeight: "600", color: "var(--text-primary)" }}>
+                  Sedang mengedit jurnal: <span style={{ color: "#2563eb" }}>{formData.tanggal} ({formData.jam})</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: "#10b981",
+                  color: "#ffffff",
+                  border: "none",
+                  fontWeight: "600",
+                  fontSize: "0.78rem",
+                  padding: "0.3rem 0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem"
+                }}
+                onClick={handleStartNewJournal}
+              >
+                <PlusCircle size={13} />
+                <span>Batal Edit & Buat Jurnal Baru</span>
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "rgba(16, 185, 129, 0.08)",
+              border: "1px solid #10b981",
+              borderRadius: "var(--radius-md)",
+              padding: "0.5rem 0.85rem",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "0.5rem"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <span style={{
+                  background: "#10b981",
+                  color: "#ffffff",
+                  padding: "3px 8px",
+                  borderRadius: "4px",
+                  fontSize: "0.72rem",
+                  fontWeight: "800",
+                  letterSpacing: "0.5px"
+                }}>
+                  MODE TAMBAH BARU
+                </span>
+                <span style={{ fontSize: "0.82rem", color: "var(--text-primary)" }}>
+                  Formulir untuk menambah catatan kegiatan harian baru ke logbook.
+                </span>
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
             <h3 style={{ fontSize: "0.95rem", fontWeight: "700", color: editingId ? "var(--accent-primary, #2563eb)" : "var(--text-primary)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
               {editingId ? <Edit3 size={16} className="text-blue-500" /> : <Sparkles size={16} className="text-amber-500" />}
@@ -939,20 +1054,58 @@ export default function JournalSection({
             </div>
           </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-            <button 
-              type="button" 
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                resetForm();
-                setIsFormOpen(false);
-              }}
-            >
-              {editingId ? "Batal Edit" : "Batal"}
-            </button>
-            <button type="submit" className="btn btn-primary btn-sm">
-              <CheckCircle2 size={14} /> {editingId ? "Simpan Perubahan Catatan" : "Simpan Catatan & Bukti Kerja"}
-            </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginTop: "1rem" }}>
+            <div>
+              {editingId ? (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{
+                    background: "#10b981",
+                    color: "#ffffff",
+                    border: "none",
+                    fontWeight: "600",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem"
+                  }}
+                  onClick={handleStartNewJournal}
+                >
+                  <PlusCircle size={14} />
+                  <span>Batal Edit & Buat Jurnal Baru</span>
+                </button>
+              ) : null}
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  resetForm();
+                  setIsFormOpen(false);
+                }}
+              >
+                {editingId ? "Batal & Tutup Form" : "Tutup Form"}
+              </button>
+              <button 
+                type="submit" 
+                className="btn btn-sm"
+                style={{
+                  background: editingId ? "#2563eb" : "#10b981",
+                  color: "#ffffff",
+                  border: "none",
+                  fontWeight: "700",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  boxShadow: editingId ? "0 2px 6px rgba(37, 99, 235, 0.3)" : "0 2px 6px rgba(16, 185, 129, 0.3)"
+                }}
+              >
+                {editingId ? <CheckCircle2 size={14} /> : <PlusCircle size={14} />}
+                <span>{editingId ? "Simpan Perubahan Edit" : "Simpan Sebagai Jurnal Baru"}</span>
+              </button>
+            </div>
           </div>
         </form>
       )}
@@ -974,13 +1127,61 @@ export default function JournalSection({
             Tulis catatan kerja kasaran Anda pada formulir di atas (boleh bahasa santai/kasar), lalu klik <strong>"✨ AI Poles Jadi Bahasa Formal ASN"</strong> untuk langsung merapikannya!
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
-            <button className="btn btn-primary btn-sm" onClick={() => setIsFormOpen(true)}>
-              <Plus size={13} /> Buka Formulir Catatan
+            <button className="btn btn-primary btn-sm" onClick={handleStartNewJournal}>
+              <PlusCircle size={14} /> Tambah Jurnal Pertama
             </button>
           </div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {/* Header Riwayat Logbook */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "0.6rem 0.25rem",
+            marginBottom: "0.25rem",
+            borderBottom: "1px solid var(--border-subtle)",
+            flexWrap: "wrap",
+            gap: "0.5rem"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <h3 style={{ fontSize: "0.95rem", fontWeight: "700", margin: 0, color: "var(--text-primary)" }}>
+                Daftar Riwayat Jurnal Kerja
+              </h3>
+              <span style={{
+                fontSize: "0.75rem",
+                fontWeight: "700",
+                background: "var(--bg-tertiary)",
+                color: "var(--text-secondary)",
+                padding: "2px 8px",
+                borderRadius: "12px",
+                border: "1px solid var(--border-subtle)"
+              }}>
+                {journals.length} Kegiatan
+              </span>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{
+                background: "#10b981",
+                color: "#ffffff",
+                border: "none",
+                fontWeight: "600",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                boxShadow: "0 2px 6px rgba(16, 185, 129, 0.25)"
+              }}
+              onClick={handleStartNewJournal}
+              title="Tambah catatan kegiatan baru"
+            >
+              <PlusCircle size={14} />
+              <span>+ Tambah Jurnal Baru</span>
+            </button>
+          </div>
           {journals.map((j, index) => {
             const attList = Array.isArray(j.attachments) && j.attachments.length > 0
               ? j.attachments
@@ -1081,6 +1282,21 @@ export default function JournalSection({
                       <span>{j.jam}</span>
                     </div>
                   )}
+                  {editingId === j.id && (
+                    <div style={{ marginTop: "4px" }}>
+                      <span style={{
+                        background: "#2563eb",
+                        color: "#ffffff",
+                        fontSize: "0.65rem",
+                        fontWeight: "800",
+                        padding: "1px 6px",
+                        borderRadius: "3px",
+                        letterSpacing: "0.5px"
+                      }}>
+                        SEDANG DIEDIT
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Uraian Aktivitas & Hasil Kegiatan */}
@@ -1170,16 +1386,22 @@ export default function JournalSection({
                   <button 
                     type="button"
                     className="btn btn-outline btn-icon btn-sm"
-                    onClick={() => handleEditJournal(j)}
+                    onClick={() => {
+                      if (editingId === j.id) {
+                        handleStartNewJournal();
+                      } else {
+                        handleEditJournal(j);
+                      }
+                    }}
                     style={{ 
-                      color: "var(--accent-primary, #2563eb)", 
+                      color: editingId === j.id ? "#ffffff" : "var(--accent-primary, #2563eb)", 
                       borderColor: editingId === j.id ? "var(--accent-primary, #2563eb)" : "var(--border-subtle)",
-                      background: editingId === j.id ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                      background: editingId === j.id ? "var(--accent-primary, #2563eb)" : "transparent",
                       width: "30px", 
                       height: "30px", 
                       padding: 0 
                     }}
-                    title="Edit catatan aktivitas ini"
+                    title={editingId === j.id ? "Sedang diedit (Klik untuk batal & buat baru)" : "Edit catatan aktivitas ini"}
                   >
                     <Edit3 size={14} />
                   </button>
