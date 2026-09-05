@@ -507,9 +507,17 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
             aktivitas: parsed.aktivitas || rawText,
             outputJumlah: parsed.outputJumlah || "1 Dokumen / Kegiatan",
             rhkId: parsed.rhkId || (rhkList[0]?.id || ""),
-            catatan: parsed.catatan || "Terselesaikan dalam kondisi optimal."
+            catatan: parsed.catatan || "Terselesaikan dalam kondisi optimal.",
+            source: "gemini"
           };
         }
+      } else if (response.status === 429) {
+        console.warn("[Gemini API] Kuota / prepayment credits habis (Status 429), beralih ke engine heuristik offline.");
+        const off = polishJournalOffline(rawText, rhkList);
+        return {
+          ...off,
+          source: "offline_429"
+        };
       }
     } catch (e) {
       console.warn("Gemini API error, beralih ke engine heuristik offline:", e);
@@ -517,7 +525,11 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
   }
 
   // Engine Heuristik Offline (Cerdas & Cepat tanpa API Key)
-  return polishJournalOffline(rawText, rhkList);
+  const offlineResult = polishJournalOffline(rawText, rhkList);
+  return {
+    ...offlineResult,
+    source: "offline"
+  };
 }
 
 /**
