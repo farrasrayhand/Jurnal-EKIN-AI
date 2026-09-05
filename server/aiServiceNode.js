@@ -30,11 +30,17 @@ Informasi Pegawai:
 Catatan Kasaran Pegawai:
 "${rawText}"
 
+Pedoman Substansi & Relevansi Tugas:
+1. Pertahankan substansi dan konteks pekerjaan riil yang ditulis pegawai! JANGAN mengubah jenis kegiatan yang tidak relevan.
+2. Contoh: Jika pegawai menulis tentang "arsip", "ijazah alumni", "berkas", "lemari dokumen", itu adalah TUGAS KEARSIPAN & TATA USAHA (gunakan: "Melakukan penataan, klasifikasi, serta penyimpanan berkas arsip..."). DILARANG KERAS mengubahnya menjadi kegiatan pembelajaran/mengajar murid hanya karena ada kata "tahun ajaran" atau "alumni"!
+3. Jika pegawai menulis tentang persuratan ("surat masuk", "disposisi"), itu adalah TUGAS TATA NASKAH DINAS & PERSURATAN.
+4. Jika pegawai menulis tentang "rekap berkas usul kenaikan pangkat", itu adalah TUGAS ADMINISTRASI KEPEGAWAIAN.
+
 Instruksi Output:
 Kembalikan HANYA format JSON valid tanpa format markdown lain:
 {
   "aktivitas": "Kalimat formal kedinasan (diawali kata kerja aktif seperti Melaksanakan, Melakukan, Menyusun, Mengoordinasikan, dsb)",
-  "outputJumlah": "Output hasil kerja yang terukur (misal: 1 Laporan Kegiatan, 1 Dokumen Berita Acara, dsb)",
+  "outputJumlah": "Output hasil kerja yang terukur (misal: 1 Laporan Kegiatan, 1 Dokumen Berkas Arsip, dsb)",
   "catatan": "Catatan ringkas teknis atau kualitatif terkait hasil tugas"
 }
 `;
@@ -84,14 +90,23 @@ export function polishJournalOfflineNode(rawText) {
 
   // Daftar prefix baku agar tidak pernah terduplikasi jika dipoles berulang kali
   const knownPrefixConfig = [
+    { prefix: "Melakukan penataan, klasifikasi, serta penyimpanan dokumen arsip", category: "kearsipan" },
+    { prefix: "Melakukan penataan, klasifikasi, serta penyimpanan", category: "kearsipan" },
+    { prefix: "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi", category: "persuratan" },
+    { prefix: "Melaksanakan pelayanan administrasi kedinasan, verifikasi kelengkapan berkas, serta pencatatan register", category: "pelayanan" },
+    { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi data kedinasan", category: "rekap" },
+    { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi", category: "rekap" },
     { prefix: "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi", category: "perbaikan" },
+    { prefix: "Melaksanakan penanganan kendala teknis, perbaikan perangkat, serta optimalisasi fungsi", category: "perbaikan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan sarana", category: "pemeliharaan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan", category: "pemeliharaan" },
+    { prefix: "Menyusun draf dokumen kedinasan, telaah administrasi, serta finalisasi laporan", category: "dokumen" },
     { prefix: "Menyusun, merumuskan draf, serta melakukan finalisasi dokumen administrasi", category: "dokumen" },
     { prefix: "Menyusun, merumuskan draf, serta melakukan finalisasi dokumen", category: "dokumen" },
-    { prefix: "Melakukan monitoring, inspeksi berkala, dan evaluasi operasional tugas kedinasan", category: "monitoring" },
+    { prefix: "Melakukan monitoring, inspeksi berkala, serta evaluasi operasional tugas kedinasan", category: "monitoring" },
     { prefix: "Melakukan monitoring, inspeksi berkala, dan evaluasi operasional", category: "monitoring" },
     { prefix: "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi", category: "pembelajaran" },
+    { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula", category: "rapat" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta pembahasan teknis", category: "rapat" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data", category: "rekap" },
@@ -120,62 +135,128 @@ export function polishJournalOfflineNode(rawText) {
     text = strippedText;
   }
 
-  const lower = text.toLowerCase();
+  // Deteksi Kategori Kegiatan secara Kontekstual & Akurat (Berdasarkan Word Boundaries)
+  const isExplicitTeaching = /\b(mengajar|ngajar|kbm|jam pelajaran|pembelajaran di kelas|kegiatan belajar mengajar)\b/i.test(text);
 
-  let formalPrefix = "Melaksanakan";
+  const isKearsipan = detectedCategory === "kearsipan" ||
+    /\b(arsip|kearsipan|mengarsipkan|pengarsipan|mengarsip|ijazah|buku induk|lemari dokumen|lemari arsip|penataan berkas|simpan berkas|penyimpanan berkas|filling|map arsip)\b/i.test(text);
+
+  const isPersuratan = detectedCategory === "persuratan" ||
+    /\b(surat masuk|surat keluar|buku agenda|disposisi|lembar disposisi|ekspedisi surat|surat dinas|surat edaran|penomoran surat)\b/i.test(text);
+
+  const isRekap = detectedCategory === "rekap" ||
+    /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data)\b/i.test(text);
+
+  const isPelayanan = detectedCategory === "pelayanan" ||
+    /\b(legalisir|pelayanan|buku tamu|buku register|surat keterangan|surat pindah|pelayanan siswa|layanan tamu)\b/i.test(text);
+
+  const isPerbaikan = detectedCategory === "perbaikan" ||
+    /\b(benerin|perbaiki|rusak|troubleshoot|troubleshooting|error|kendala teknis|jaringan mati|wifi mati|pc mati|komputer rusak|penanganan kendala)\b/i.test(text) ||
+    (/\b(mikrotik|router|kabel lan|server|switch|jaringan)\b/i.test(text) && /\b(mati|rusak|error|gangguan|down|putus|bermasalah|kendala)\b/i.test(text));
+
+  const isPemeliharaan = detectedCategory === "pemeliharaan" ||
+    /\b(bersih|bersihin|rawat|maintenance|pemeliharaan berkala|perawatan sarana|cek rutin lab)\b/i.test(text);
+
+  const isRapat = detectedCategory === "rapat" ||
+    /\b(rapat|koordinasi|briefing|notula|rapat dinas|sidang|audiensi)\b/i.test(text);
+
+  const isPembelajaran = detectedCategory === "pembelajaran" || isExplicitTeaching ||
+    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap);
+
+  const isDokumen = detectedCategory === "dokumen" ||
+    /\b(bikin laporan|buat laporan|susun laporan|draf|draft|penyusunan dokumen|sk pembagian tugas|jadwal kegiatan)\b/i.test(text);
+
+  const isMonitoring = detectedCategory === "monitoring" ||
+    /\b(cek|ngecek|pantau|monitor|inspeksi|pengawasan)\b/i.test(text);
+
+  // Default Template Formal ASN
+  let formalPrefix = "Melaksanakan tugas operasional kedinasan";
   let output = "1 Laporan Pelaksanaan Tugas";
   let catatan = "Kegiatan terselesaikan dengan tertib dan memenuhi standar pelayanan.";
 
-  if (detectedCategory === "perbaikan" || lower.includes("benerin") || lower.includes("perbaiki") || lower.includes("rusak") || lower.includes("troubleshoot") || lower.includes("error")) {
-    formalPrefix = "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi";
-    output = "1 Berkas Berita Acara Perbaikan";
-    catatan = "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.";
-  } else if (detectedCategory === "pemeliharaan" || lower.includes("bersih") || lower.includes("rawat") || lower.includes("maintenance")) {
-    formalPrefix = "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan sarana";
-    output = "1 Lembar Checklist Pemeliharaan";
-    catatan = "Kondisi peralatan terverifikasi bersih, aman, dan siap dipergunakan.";
-  } else if (detectedCategory === "dokumen" || lower.includes("bikin") || lower.includes("buat") || lower.includes("susun") || lower.includes("jadwal") || lower.includes("surat") || lower.includes("draf")) {
-    formalPrefix = "Menyusun, merumuskan draf, serta melakukan finalisasi dokumen administrasi";
-    output = "1 Berkas Dokumen Administrasi";
-    catatan = "Draf dokumen telah divalidasi dan disesuaikan dengan tata naskah dinas.";
-  } else if (detectedCategory === "monitoring" || lower.includes("cek") || lower.includes("ngecek") || lower.includes("pantau") || lower.includes("monitor") || lower.includes("inspeksi")) {
-    formalPrefix = "Melakukan monitoring, inspeksi berkala, dan evaluasi operasional tugas kedinasan";
-    output = "1 Laporan Monitoring dan Evaluasi";
-    catatan = "Hasil pemantauan menunjukkan sistem/sarana bekerja stabil tanpa kendala.";
-  } else if (detectedCategory === "pembelajaran" || lower.includes("ajar") || lower.includes("ngajar") || lower.includes("siswa") || lower.includes("kelas") || lower.includes("murid")) {
+  if (isExplicitTeaching) {
     formalPrefix = "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi";
     output = "1 Jurnal Pembelajaran & Daftar Hadir";
-    catatan = "Peserta didik antusias dan seluruh target kompetensi tercapai baik.";
-  } else if (detectedCategory === "rapat" || lower.includes("rapat") || lower.includes("koordinasi") || lower.includes("ngobrol") || lower.includes("briefing") || lower.includes("zoom")) {
-    formalPrefix = "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta pembahasan teknis";
-    output = "1 Notula Rapat & Daftar Hadir";
-    catatan = "Telah dicapai kesepakatan bersama dan rencana tindak lanjut operasional.";
-  } else if (detectedCategory === "rekap" || lower.includes("rekap") || lower.includes("ngerekap") || lower.includes("data") || lower.includes("input") || lower.includes("entri")) {
-    formalPrefix = "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data kedinasan";
-    output = "1 Rekapitulasi Data Terverifikasi";
-    catatan = "Seluruh data telah divalidasi dengan tingkat akurasi 100%.";
-  } else if (detectedCategory === "distribusi" || lower.includes("kirim") || lower.includes("antar") || lower.includes("distribusi") || lower.includes("antar surat")) {
-    formalPrefix = "Melaksanakan pengelolaan dan pendistribusian dokumen kedinasan";
-    output = "1 Ekspedisi Pengiriman Surat";
-    catatan = "Dokumen dinas telah diterima oleh pihak terkait dalam kondisi lengkap.";
+    catatan = "Kegiatan belajar mengajar berlangsung interaktif dan seluruh capaian materi terpenuhi baik.";
+  } else if (isKearsipan) {
+    formalPrefix = "Melakukan penataan, klasifikasi, serta penyimpanan";
+    output = "1 Berkas Pengelolaan Arsip Dokumen";
+    catatan = "Berkas dokumen telah diverifikasi, tersusun secara sistematis, dan disimpan aman pada lemari arsip sesuai klasifikasi.";
+  } else if (isPersuratan) {
+    formalPrefix = "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi";
+    output = "1 Berkas Pengelolaan Surat Dinas";
+    catatan = "Surat kedinasan telah teragendakan dan didistribusikan secara tertib sesuai disposisi pimpinan.";
+  } else if (isPelayanan) {
+    formalPrefix = "Melaksanakan pelayanan administrasi kedinasan, verifikasi kelengkapan berkas, serta pencatatan register";
+    output = "1 Berkas Register Pelayanan Administrasi";
+    catatan = "Pelayanan terlaksana secara tertib, ramah, dan memenuhi standar operasional pelayanan publik.";
+  } else if (isRekap) {
+    formalPrefix = "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi";
+    output = "1 Dokumen Rekapitulasi Terverifikasi";
+    catatan = "Seluruh data dan berkas telah divalidasi dengan tingkat akurasi serta kelengkapan 100%.";
+  } else if (isPerbaikan) {
+    formalPrefix = "Melaksanakan penanganan kendala teknis, perbaikan perangkat, serta optimalisasi fungsi";
+    output = "1 Berkas Berita Acara Penanganan Teknis";
+    catatan = "Perangkat/sistem telah diuji fungsional dan kembali beroperasi secara optimal.";
+  } else if (isPemeliharaan) {
+    formalPrefix = "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan sarana";
+    output = "1 Lembar Checklist Pemeliharaan";
+    catatan = "Kondisi sarana dan peralatan terverifikasi bersih, aman, dan siap dipergunakan.";
+  } else if (isRapat) {
+    formalPrefix = "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula";
+    output = "1 Dokumen Notula Rapat & Daftar Hadir";
+    catatan = "Telah dicapai kesepakatan bersama dan rencana tindak lanjut operasional tugas dinas.";
+  } else if (isPembelajaran) {
+    formalPrefix = "Melaksanakan kegiatan pembelajaran, pendampingan praktik peserta didik, serta evaluasi materi";
+    output = "1 Jurnal Pembelajaran & Daftar Hadir";
+    catatan = "Kegiatan belajar mengajar berlangsung interaktif dan seluruh capaian materi terpenuhi baik.";
+  } else if (isDokumen) {
+    formalPrefix = "Menyusun draf dokumen kedinasan, telaah administrasi, serta finalisasi laporan";
+    output = "1 Berkas Dokumen Administrasi";
+    catatan = "Draf dokumen telah divalidasi dan disesuaikan dengan format tata naskah dinas.";
+  } else if (isMonitoring) {
+    formalPrefix = "Melakukan monitoring, inspeksi berkala, serta evaluasi operasional tugas kedinasan";
+    output = "1 Laporan Monitoring dan Evaluasi";
+    catatan = "Hasil pemantauan menunjukkan operasional sarana/tugas berjalan stabil tanpa kendala.";
   }
 
-  // Bersihkan partikel santai & kata kerja kasaran yang telah diwakili oleh prefix
+  // Bersihkan partikel santai & kata kerja kasaran
   let cleaned = text
     .replace(/^(tadi|hari ini|udah|sudah|lagi|sedang|mau|pengen|aku|saya|kita|kami)\s+/gi, "")
-    .replace(/^(ngerekap|rekap|input|menginput|penginputan)\s+/gi, "")
+    .replace(/^(ngerekap|rekap|input|menginput|penginputan|entri|mengentri)\s+/gi, "")
+    .replace(/^(arsip|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
+    .replace(/^(benerin|perbaiki|memperbaiki|beneri)\s+/gi, "")
+    .replace(/^(bersihin|membersihkan|rawat|merawat)\s+/gi, "")
+    .replace(/^(bikin|buat|membuat|susun|menyusun)\s+/gi, "")
+    .replace(/^(ngecek|cek|memeriksa|pantau|memantau)\s+/gi, "")
+    .replace(/^(ngajar|mengajar)\s+/gi, "")
     .replace(/\b(terus|lalu|trs|trus|abis|setelah itu)\b/gi, "serta")
     .replace(/\b(benerin|perbaiki|rusak)\b/gi, "penanganan kendala")
     .replace(/\b(bersihin|rawat)\b/gi, "pemeliharaan")
     .replace(/\b(bikin|buat)\b/gi, "penyusunan")
     .replace(/\b(biar|supaya)\b/gi, "guna memastikan")
     .replace(/\b(ga|gak|nggak|tidak)\s+(ada|bisa)\b/gi, "mencegah kendala")
+    .replace(/\bkemarin\b/gi, "sebelumnya")
     .replace(/\b(wifi|internet|jaringan)\b/gi, "konektivitas jaringan internet")
+    .replace(/\b(lab|ruang lab)\b/gi, "Ruang Praktik Siswa LAB")
+    .replace(/\blemari dokumen arsip\b/gi, "lemari arsip")
+    .replace(/\blemari dokumen\b/gi, "lemari arsip dokumen")
+    .replace(/\barsip b\b/gi, "arsip B")
     .trim();
 
   cleaned = cleaned.replace(/[.]+$/, "").trim();
 
-  let polished = cleaned ? `${formalPrefix} ${cleaned}` : formalPrefix;
+  let polished = "";
+  if (cleaned) {
+    if (isKearsipan && !cleaned.toLowerCase().startsWith("dokumen") && !cleaned.toLowerCase().startsWith("berkas")) {
+      polished = `${formalPrefix} dokumen ${cleaned}`;
+    } else {
+      polished = `${formalPrefix} ${cleaned}`;
+    }
+  } else {
+    polished = formalPrefix;
+  }
+
   polished = polished.charAt(0).toUpperCase() + polished.slice(1);
   if (!polished.endsWith(".")) polished += ".";
 
