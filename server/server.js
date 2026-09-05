@@ -117,6 +117,34 @@ import("./telegramBot.js")
     console.error("⚠️ [Auto-Start] Gagal memuat Bot Telegram:", err.message);
   });
 
+const getBotConfig = () => {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  const username = (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
+  return {
+    enabled: Boolean(token),
+    username: username
+  };
+};
+
+const getAiConfig = () => {
+  const rawKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim();
+  const hasServerKey = Boolean(
+    rawKey && 
+    !rawKey.includes("PASTE_HERE") && 
+    !rawKey.includes("KEY_ANDA") && 
+    rawKey.length > 10
+  );
+  return {
+    enabled: hasServerKey,
+    hasServerKey: hasServerKey,
+    provider: "gemini",
+    model: "gemini-2.5-flash"
+  };
+};
+
 // 2. Buat HTTP Server untuk Web App & API Sync yang Aman
 const server = http.createServer(async (req, res) => {
   // Pasang security headers di setiap respons
@@ -170,34 +198,6 @@ const server = http.createServer(async (req, res) => {
     res.end("403 Forbidden: Akses ke direktori internal sistem ditolak.");
     return;
   }
-
-  const getBotConfig = () => {
-    const token = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
-    const username = (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
-    return {
-      enabled: Boolean(token),
-      username: username
-    };
-  };
-
-  const getAiConfig = () => {
-    const rawKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || "")
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .trim();
-    const hasServerKey = Boolean(
-      rawKey && 
-      !rawKey.includes("PASTE_HERE") && 
-      !rawKey.includes("KEY_ANDA") && 
-      rawKey.length > 10
-    );
-    return {
-      enabled: hasServerKey,
-      hasServerKey: hasServerKey,
-      provider: "gemini",
-      model: "gemini-2.5-flash"
-    };
-  };
 
   // Endpoint Autentikasi Login Aman Server-Side (Cegah Bocor Password ke Client)
   if (pathname === "/api/auth/login") {
