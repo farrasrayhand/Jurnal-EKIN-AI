@@ -85,10 +85,19 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
                 source: `gemini-ai (${model})`
               };
             }
-          } else if (response.status === 429) {
-            console.warn(`[Gemini API] Model ${model} terkena limit 429 (kuota rate limit), mencoba model cadangan...`);
           } else {
-            console.warn(`[Gemini API] Model ${model} respon status ${response.status}, mencoba model cadangan...`);
+            let errorDetail = "";
+            try {
+              const errBody = await response.json();
+              errorDetail = errBody.error?.message || JSON.stringify(errBody);
+            } catch (e) {
+              errorDetail = response.statusText || "";
+            }
+            if (response.status === 429) {
+              console.warn(`[Gemini API] Model ${model} limit 429: ${errorDetail}`);
+            } else {
+              console.warn(`[Gemini API] Model ${model} status ${response.status}: ${errorDetail}`);
+            }
           }
         } catch (mErr) {
           console.warn(`[Gemini API] Gagal memanggil ${model}:`, mErr.message);
