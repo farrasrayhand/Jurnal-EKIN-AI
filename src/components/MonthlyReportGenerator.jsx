@@ -611,6 +611,7 @@ export default function MonthlyReportGenerator({
       {/* ========================================================================= */}
       <div 
         id="monthly-report-sheet"
+        className="print-sheet"
         style={{
           background: "#ffffff",
           color: "#000000",

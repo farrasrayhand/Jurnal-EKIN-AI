@@ -1081,9 +1081,26 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     color: #000000 !important;
     font-size: 10pt !important;
     font-family: 'Times New Roman', Times, serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  .no-print, .app-header, .ai-generator-box, .tabs-nav, .header-actions, .btn, .modal-overlay, .preview-only-link {
+  /* Sembunyikan semua elemen UI — hanya sheet yang dicetak */
+  .no-print,
+  .app-header,
+  .ai-generator-box,
+  .tabs-nav,
+  .header-actions,
+  .btn,
+  .modal-overlay,
+  .preview-only-link,
+  /* Sembunyikan kontrol & wrapper di sekitar sheet */
+  .month-nav-bar,
+  .report-controls,
+  .download-buttons,
+  .narasi-section,
+  .tabs-content > *:not(:has(#monthly-report-sheet)),
+  nav, header, footer, aside {
     display: none !important;
   }
 
@@ -1091,15 +1108,22 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     display: block !important;
   }
 
+  /* Jangan cetak URL setelah link */
   a[href]:after {
     content: none !important;
   }
 
-  .app-container {
-    max-width: 100% !important;
-    padding: 0 !important;
+  /* Reset semua wrapper container */
+  body > *, .app-container, .app-main, .tabs-content, .page-content, main {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
     margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
+
 
   .bkn-print-document {
     display: block !important;
@@ -1145,9 +1169,22 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     height: 70px !important;
   }
 
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm;
+  }
+
   #monthly-report-sheet {
     background: #ffffff !important;
     color: #000000 !important;
+    /* Hilangkan tampilan "kotak kertas" saat print */
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
   #monthly-report-sheet table,
   #monthly-report-sheet td,
@@ -1159,8 +1196,11 @@ select optgroup, .select-field optgroup, .form-select optgroup {
   #monthly-report-sheet tr[style*="background"] {
     background: #f0f0f0 !important;
     color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }
+
 
 /* ==========================================================================
    Dark Mode Eye-Comfort Enhancements & Sheet Styling
