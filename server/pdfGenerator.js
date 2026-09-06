@@ -469,7 +469,11 @@ export async function generateMonthlyReportZip({
   const pdfFileName = `Laporan_Kinerja_${monthName}_${year}_${cleanPegawaiName}.pdf`;
 
   const zip = new JSZip();
-  zip.file(pdfFileName, pdfBuffer);
+  // Masukkan seluruh berkas ke dalam folder utama Bulan_Tahun (misal: September_2026)
+  const rootFolderName = `${monthName}_${year}`;
+  const folder = zip.folder(rootFolderName);
+
+  folder.file(pdfFileName, pdfBuffer);
 
   const filtered = journals.filter(j => {
     if (!j.tanggal) return false;
@@ -517,8 +521,7 @@ export async function generateMonthlyReportZip({
       }
 
       if (fileBuffer) {
-        zip.file(`lampiran_${monthName}_${year}/${trackableFileName}`, fileBuffer);
-        zip.file(`lampiran/${trackableFileName}`, fileBuffer);
+        folder.file(`lampiran/${trackableFileName}`, fileBuffer);
         daftarLampiranEntries.push({
           no: labelNumber,
           fileName: trackableFileName,
@@ -540,11 +543,9 @@ export async function generateMonthlyReportZip({
       daftarText += `[${item.no}] Lampiran ${item.no}: ${item.fileName} (${item.type})\n    - Tanggal  : ${item.tanggal}\n    - Aktivitas: ${item.aktivitas}\n    - Output   : ${item.output}\n\n`;
     });
   }
-  daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Berkas PDF laporan resmi dan seluruh berkas lampiran eviden di atas telah\n   diberi penomoran runtut (lampiran-1, lampiran-2, dst.) agar mudah ditelusuri.\n2. Jika satu kegiatan memuat beberapa berkas, nomor lampiran bertingkat (misal: lampiran-1.1, lampiran-1.2).\n3. Anda dapat langsung mengunggah arsip .ZIP ini atau mengekstrak folder\n   lampiran ke dalam folder Google Drive bukti dukung Anda.\n`;
-  if (gdriveLink) daftarText += `4. Tautan Folder Google Drive Terdaftar: ${gdriveLink}\n`;
-  daftarText += `========================================================================\n`;
+  daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Folder ini dinamai "${rootFolderName}" agar saat diunggah ke Google Drive\n   berkas tidak tertukar atau mereplace berkas dari bulan lain.\n2. Berkas laporan PDF dan seluruh lampiran di folder "lampiran/"\n   telah diberi penomoran runtut untuk memudahkan pelacakan.\n3. Tautan folder Google Drive terdaftar: ${gdriveLink || "(Belum diatur)"}\n========================================================================\n`;
 
-  zip.file("DAFTAR_LAMPIRAN.txt", daftarText);
+  folder.file("DAFTAR_LAMPIRAN.txt", Buffer.from(daftarText, "utf-8"));
 
   const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
   const zipFileName = `Paket_Laporan_Kinerja_${monthName}_${year}_${cleanPegawaiName}.zip`;

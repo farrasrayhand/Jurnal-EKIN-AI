@@ -366,6 +366,8 @@ export default function MonthlyReportGenerator({
       const zip = new JSZip();
       const monthName = currentMonthData.monthObj.name;
       const cleanName = (pegawai.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
+      const rootFolderName = `${monthName}_${selectedYear}`;
+      const folder = zip.folder(rootFolderName);
 
       let daftarText = `========================================================================\nDAFTAR LAMPIRAN BUKTI EVIDEN KINERJA PEGAWAI\nPeriode    : Bulan ${monthName} ${selectedYear}\nPegawai    : ${pegawai.nama || "-"} (NIP: ${pegawai.nip || "-"})\nJabatan    : ${pegawai.jabatan || "-"}\nUnit Kerja : ${pegawai.unitKerja || "-"}\n========================================================================\n\n`;
 
@@ -376,15 +378,13 @@ export default function MonthlyReportGenerator({
 
         if (jrn.fotoUrl && jrn.fotoUrl.startsWith("data:")) {
           const b64 = jrn.fotoUrl.replace(/^data:[^;]+;base64,/, "");
-          zip.file(`lampiran_${monthName}_${selectedYear}/${lampiranFileName}`, b64, { base64: true });
-          zip.file(`lampiran/${lampiranFileName}`, b64, { base64: true });
+          folder.file(`lampiran/${lampiranFileName}`, b64, { base64: true });
         } else if (jrn.fileUrl || jrn.fotoUrl) {
           try {
             const fRes = await fetch(jrn.fileUrl || jrn.fotoUrl);
             if (fRes.ok) {
               const bBlob = await fRes.blob();
-              zip.file(`lampiran_${monthName}_${selectedYear}/${lampiranFileName}`, bBlob);
-              zip.file(`lampiran/${lampiranFileName}`, bBlob);
+              folder.file(`lampiran/${lampiranFileName}`, bBlob);
             }
           } catch (e) {}
         }
@@ -407,9 +407,9 @@ export default function MonthlyReportGenerator({
         });
       }
 
-      daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Berkas laporan dan seluruh berkas lampiran di atas telah diberi penomoran\n   runtut (lampiran-1, lampiran-2, dst.) untuk memudahkan pelacakan.\n2. Tautan folder Google Drive terdaftar: ${gdriveLink}\n========================================================================\n`;
+      daftarText += `------------------------------------------------------------------------\nPetunjuk Unggah ke Google Drive:\n1. Folder ini dinamai "${rootFolderName}" agar saat diunggah ke Google Drive\n   berkas tidak tertukar atau mereplace berkas dari bulan lain.\n2. Berkas laporan PDF dan seluruh lampiran di folder "lampiran/"\n   telah diberi penomoran runtut untuk memudahkan pelacakan.\n3. Tautan folder Google Drive terdaftar: ${gdriveLink || "(Belum diatur)"}\n========================================================================\n`;
 
-      zip.file("DAFTAR_LAMPIRAN.txt", daftarText);
+      folder.file("DAFTAR_LAMPIRAN.txt", daftarText);
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const url = window.URL.createObjectURL(zipBlob);
