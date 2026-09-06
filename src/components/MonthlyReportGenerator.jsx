@@ -169,12 +169,12 @@ export default function MonthlyReportGenerator({
   };
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPrintingPdf, setIsPrintingPdf] = useState(false);
 
-  // Handler Download PDF Langsung dari Server API
-  const handleDownloadPdfDirect = async () => {
+  // Handler Unduh Laporan PDF Resmi (Generated Server-side via PDFKit)
+  const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
-      // Ambil session token & username dari localStorage agar server bisa identifikasi user yang login
       let sessionToken = "";
       let sessionUsername = "";
       try {
@@ -213,23 +213,91 @@ export default function MonthlyReportGenerator({
         confetti({ particleCount: 30, spread: 50 });
         return;
       }
-      // Fallback ke window print jika API server tidak merespons
-      handlePrint();
+      runHtmlWindowPrint();
     } catch (e) {
-      handlePrint();
+      runHtmlWindowPrint();
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
-  const handlePrint = () => {
+  // Handler Cetak / Dialog Print: Menggunakan PDF asli yang sama persis dengan yang diunduh
+  const handlePrint = async () => {
+    setIsPrintingPdf(true);
+    try {
+      let sessionToken = "";
+      let sessionUsername = "";
+      try {
+        const rawSession = localStorage.getItem("ekinerja_auth_session");
+        if (rawSession) {
+          const parsed = JSON.parse(rawSession);
+          sessionToken = parsed?.token || "";
+          sessionUsername = parsed?.user?.username || parsed?.user?.id || "";
+        }
+      } catch (e) {}
+
+      const query = new URLSearchParams({
+        month: selectedMonth,
+        year: selectedYear,
+        userId: pegawai?.id || "",
+        username: sessionUsername,
+        token: sessionToken,
+        gdriveLink: gdriveLink || ""
+      });
+
+      const res = await fetch(`/api/reports/pdf?${query.toString()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        // Buat iframe tersembunyi untuk mencetak berkas PDF resmi asli
+        let iframe = document.getElementById("pdf-print-frame");
+        if (!iframe) {
+          iframe = document.createElement("iframe");
+          iframe.id = "pdf-print-frame";
+          iframe.style.position = "fixed";
+          iframe.style.right = "0";
+          iframe.style.bottom = "0";
+          iframe.style.width = "0";
+          iframe.style.height = "0";
+          iframe.style.border = "none";
+          document.body.appendChild(iframe);
+        }
+
+        iframe.src = blobUrl;
+        iframe.onload = () => {
+          setTimeout(() => {
+            try {
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+            } catch (err) {
+              // Jika browser membatasi print iframe, buka jendela PDF asli langsung
+              const printWin = window.open(blobUrl, "_blank");
+              if (printWin) {
+                printWin.onload = () => printWin.print();
+              }
+            }
+          }, 300);
+        };
+        return;
+      }
+
+      // Fallback jika fetch gagal
+      runHtmlWindowPrint();
+    } catch (e) {
+      runHtmlWindowPrint();
+    } finally {
+      setIsPrintingPdf(false);
+    }
+  };
+
+  const runHtmlWindowPrint = () => {
     document.body.classList.add("is-printing-report");
     const origTitle = document.title;
     const monthName = currentMonthData.monthObj.name;
     const cleanName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
     document.title = `Laporan_Kinerja_${monthName}_${selectedYear}_${cleanName}`;
     
-    // Beri jeda kecil agar browser merender style print sebelum memicu dialog print
     setTimeout(() => {
       window.print();
       document.body.classList.remove("is-printing-report");
@@ -442,7 +510,7 @@ export default function MonthlyReportGenerator({
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={handleDownloadPdfDirect}
+              onClick={handleDownloadPdf}
               disabled={isDownloadingPdf}
               style={{
                 background: "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
@@ -472,6 +540,7 @@ export default function MonthlyReportGenerator({
               type="button"
               className="btn btn-primary"
               onClick={handlePrint}
+              disabled={isPrintingPdf}
               style={{
                 background: "#2563eb",
                 borderColor: "#2563eb",
@@ -480,11 +549,19 @@ export default function MonthlyReportGenerator({
                 display: "flex",
                 alignItems: "center",
                 gap: "0.5rem",
-                boxShadow: "0 2px 8px rgba(37, 99, 235, 0.25)"
+                boxShadow: "0 2px 8px rgba(37, 99, 235, 0.25)",
+                cursor: isPrintingPdf ? "not-allowed" : "pointer"
               }}
+              title="Buka dialog cetak dengan berkas PDF resmi yang sama persis"
             >
-              <Printer size={16} />
-              <span>Cetak / Dialog PDF (A4)</span>
+              {isPrintingPdf ? (
+                <span>⏳ Memuat PDF...</span>
+              ) : (
+                <>
+                  <Printer size={16} />
+                  <span>Cetak / Dialog PDF (A4)</span>
+                </>
+              )}
             </button>
           </div>
         </div>
