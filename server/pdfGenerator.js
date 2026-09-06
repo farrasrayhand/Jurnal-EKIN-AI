@@ -195,9 +195,9 @@ export function generateMonthlyReportPdf({
       doc.font("Times-Bold").fontSize(10).text("I. DATA PEGAWAI");
       doc.moveDown(0.3);
 
-      const tableLeft = 40;
-      const tableWidth = 515;
-      const col1Width = 140;
+      const tableLeft = 35;
+      const tableWidth = 525;
+      const col1Width = 145;
       const col2Width = tableWidth - col1Width;
 
       const pegawaiFields = [
@@ -225,7 +225,7 @@ export function generateMonthlyReportPdf({
       doc.font("Times-Bold").fontSize(10).text("II. TABEL KEGIATAN DAN FOTO DOKUMENTASI");
       doc.moveDown(0.3);
 
-      const colW = [25, 75, 230, 85, 100];
+      const colW = [22, 72, 240, 90, 101];
       const headers = ["No", "Hari / Tanggal", "Uraian Tugas / Aktivitas Kedinasan", "Output / Hasil Kerja", "Bukti Eviden / Lampiran"];
       const headerH = 22;
 
@@ -247,7 +247,12 @@ export function generateMonthlyReportPdf({
         return y === String(year) && String(m).padStart(2, "0") === String(month).padStart(2, "0");
       });
 
-      filtered.sort((a, b) => (a.tanggal > b.tanggal ? 1 : -1));
+      // Sort ascending: tanggal terlama dulu (urutan kronologis)
+      filtered.sort((a, b) => {
+        const dateA = (a.tanggal || "") + (a.jam || "");
+        const dateB = (b.tanggal || "") + (b.jam || "");
+        return dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+      });
 
       let physicalCount = 0;
       const enrichedJournals = filtered.map(jrn => {
@@ -298,12 +303,13 @@ export function generateMonthlyReportPdf({
           const fullUraian = taskText + catText;
 
           const textHeight = doc.heightOfString(fullUraian, { width: colW[2] - 10 });
+          const totalAttCount = (jrn.allAtts || []).length;
           const hasPhoto = (jrn.allAtts || []).some(a => a.type === "photo");
           const hasDocFile = (jrn.allAtts || []).some(a => a.type !== "photo");
-          const minHeight = hasPhoto ? 58 : (hasDocFile ? 46 : 38);
-          const rowH = Math.max(minHeight, textHeight + 12);
+          const minHeight = hasPhoto ? 64 : (hasDocFile ? 50 : 42);
+          const rowH = Math.max(minHeight, textHeight + 16);
 
-          if (tableY + rowH > 750) {
+          if (tableY + rowH > 730) {
             doc.addPage();
             tableY = 40;
             let newX = tableLeft;
