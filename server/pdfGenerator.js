@@ -192,13 +192,13 @@ export function generateMonthlyReportPdf({
       doc.moveDown(1);
 
       // 2. BAGIAN I: DATA PEGAWAI
-      doc.font("Times-Bold").fontSize(10).text("I. DATA PEGAWAI");
-      doc.moveDown(0.3);
-
       const tableLeft = 35;
       const tableWidth = 525;
-      const col1Width = 145;
+      const col1Width = 140;
       const col2Width = tableWidth - col1Width;
+
+      doc.font("Times-Bold").fontSize(10).text("I. DATA PEGAWAI", tableLeft, doc.y);
+      doc.moveDown(0.3);
 
       const pegawaiFields = [
         ["Nama Pegawai", pegawai?.nama || "-"],
@@ -222,7 +222,7 @@ export function generateMonthlyReportPdf({
       doc.y = curY + 12;
 
       // 3. BAGIAN II: TABEL KEGIATAN DAN FOTO DOKUMENTASI
-      doc.font("Times-Bold").fontSize(10).text("II. TABEL KEGIATAN DAN FOTO DOKUMENTASI");
+      doc.font("Times-Bold").fontSize(10).text("II. TABEL KEGIATAN DAN FOTO DOKUMENTASI", tableLeft, curY + 12);
       doc.moveDown(0.3);
 
       const colW = [22, 72, 240, 90, 101];
