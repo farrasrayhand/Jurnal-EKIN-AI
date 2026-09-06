@@ -171,8 +171,8 @@ export function extractTimeAndDate(text, defaultJam = "08:00 - 16:00") {
   let detectedJam = null;
   let detectedDate = null;
 
-  // 1. Deteksi Pola Jam Rentang dengan Menit (misal: "08:00 - 16:00", "jam 08.00-11.30", "(jam 07.30 - 15.00)", "pukul 07.30 s/d 15.00 WIB", "[08:00 - 12:00]")
-  const rangeTimeWithMinutesRegex = /(?:\(?\s*(?:jam|pukul|waktu)?\s*[:=]?\s*\(?)\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai|\/)\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
+  // 1. Deteksi Pola Jam Rentang dengan Menit (misal: "08:00 - 16:00", "dari jam 08.00 - 11.30 wita", "pukul 07.30 s/d 15.00 WIB", "[08:00 - 12:00]")
+  const rangeTimeWithMinutesRegex = /(?:\(?\s*(?:dari|mulai)?\s*(?:jam|pukul|waktu)?\s*[:=]?\s*\(?)\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai|\/)\s*(?:jam|pukul|waktu)?\s*([0-2]?[0-9])[:.]([0-5][0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
   const matchRangeMin = cleanText.match(rangeTimeWithMinutesRegex);
   if (matchRangeMin) {
     const h1 = parseInt(matchRangeMin[1], 10);
@@ -186,9 +186,9 @@ export function extractTimeAndDate(text, defaultJam = "08:00 - 16:00") {
     }
   }
 
-  // 2. Deteksi Pola Jam Rentang Angka Bulat (misal: "jam 8 - 16", "pukul 8-12", "(jam 8 sampai 15)")
+  // 2. Deteksi Pola Jam Rentang Angka Bulat (misal: "dari jam 10-13 wita", "jam 8 - 16", "pukul 8-12", "jam 8 sampai 15")
   if (!detectedJam) {
-    const rangeHourRegex = /(?:\(?\s*(?:jam|pukul|waktu)\s*[:=]?\s*|\()\s*([0-2]?[0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai)\s*([0-2]?[0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
+    const rangeHourRegex = /(?:\(?\s*(?:dari|mulai)?\s*(?:jam|pukul|waktu)\s*[:=]?\s*|\()\s*([0-2]?[0-9])\s*(?:-|–|—|s\.?d\.?|s\/d|sampai)\s*(?:jam|pukul|waktu)?\s*([0-2]?[0-9])\s*(?:wib|wita|wit)?\s*[\)\]]?/i;
     const matchRangeHour = cleanText.match(rangeHourRegex);
     if (matchRangeHour) {
       const h1 = parseInt(matchRangeHour[1], 10);
@@ -200,30 +200,50 @@ export function extractTimeAndDate(text, defaultJam = "08:00 - 16:00") {
     }
   }
 
-  // 3. Deteksi Tanggal ISO (YYYY-MM-DD), misal: "tgl 2026-09-04" atau "2026-09-04"
-  const dateIsoRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)?(\b20\d{2}[-/][0-1]\d[-/][0-3]\d\b)\s*[\)\]]?/i;
-  const matchIso = cleanText.match(dateIsoRegex);
-  if (matchIso) {
-    detectedDate = matchIso[1].replace(/\//g, "-");
-    cleanText = cleanText.replace(matchIso[0], " ").trim();
+  // 3. Deteksi Kata Relatif Hari (misal: "kemarin lusa", "kemarin", "hari ini")
+  const relativeDateRegex = /\b(?:pada\s+)?(kemarin\s+lusa|lusa\s+lalu|kemarin|hari\s+ini)\b/i;
+  const matchRel = cleanText.match(relativeDateRegex);
+  if (matchRel) {
+    const word = matchRel[1].toLowerCase();
+    const d = new Date();
+    if (word.includes("kemarin lusa") || word.includes("lusa lalu")) {
+      d.setDate(d.getDate() - 2);
+    } else if (word === "kemarin") {
+      d.setDate(d.getDate() - 1);
+    }
+    const yStr = d.getFullYear();
+    const mStr = String(d.getMonth() + 1).padStart(2, "0");
+    const dStr = String(d.getDate()).padStart(2, "0");
+    detectedDate = `${yStr}-${mStr}-${dStr}`;
+    cleanText = cleanText.replace(matchRel[0], " ").trim();
   }
 
-  // 4. Deteksi Tanggal Format Teks Indonesia (misal: "tgl 5 September 2026")
+  // 4. Deteksi Tanggal ISO (YYYY-MM-DD), misal: "tgl 2026-09-04" atau "2026-09-04"
   if (!detectedDate) {
-    const dateIndoTextRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)?(\b[0-3]?\d)\s+([a-zA-Z]+)\s+(20\d{2})\b\s*[\)\]]?/i;
+    const dateIsoRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)?(\b20\d{2}[-/][0-1]\d[-/][0-3]\d\b)\s*[\)\]]?/i;
+    const matchIso = cleanText.match(dateIsoRegex);
+    if (matchIso) {
+      detectedDate = matchIso[1].replace(/\//g, "-");
+      cleanText = cleanText.replace(matchIso[0], " ").trim();
+    }
+  }
+
+  // 5. Deteksi Tanggal Format Teks Indonesia (misal: "tanggal 23 agustus 2026", "tgl 5 September", "23 Agustus")
+  if (!detectedDate) {
+    const dateIndoTextRegex = /(?:\(?\s*(?:pada\s+)?(?:tanggal|tgl)\s*[:=]?\s*)?(\b[0-3]?\d)\s+([a-zA-Z]+)(?:\s+(20\d{2}))?\b\s*[\)\]]?/i;
     const matchIndo = cleanText.match(dateIndoTextRegex);
     if (matchIndo && NAMA_BULAN_MAP[matchIndo[2].toLowerCase()]) {
       const d = String(parseInt(matchIndo[1], 10)).padStart(2, "0");
       const m = NAMA_BULAN_MAP[matchIndo[2].toLowerCase()];
-      const y = matchIndo[3];
+      const y = matchIndo[3] || String(new Date().getFullYear());
       detectedDate = `${y}-${m}-${d}`;
       cleanText = cleanText.replace(matchIndo[0], " ").trim();
     }
   }
 
-  // 5. Deteksi Tanggal Format Angka (misal: "tgl 04/09/2026", "tanggal 4-9-2026")
+  // 6. Deteksi Tanggal Format Angka (misal: "tgl 04/09/2026", "tanggal 4-9-2026")
   if (!detectedDate) {
-    const dateNumRegex = /(?:\(?\s*(?:tanggal|tgl)\s*[:=]?\s*)(\b[0-3]?\d)[-/]([0-1]?\d)[-/](20\d{2})\b\s*[\)\]]?/i;
+    const dateNumRegex = /(?:\(?\s*(?:pada\s+)?(?:tanggal|tgl)\s*[:=]?\s*)(\b[0-3]?\d)[-/]([0-1]?\d)[-/](20\d{2})\b\s*[\)\]]?/i;
     const matchNum = cleanText.match(dateNumRegex);
     if (matchNum) {
       const d = String(parseInt(matchNum[1], 10)).padStart(2, "0");
@@ -239,6 +259,7 @@ export function extractTimeAndDate(text, defaultJam = "08:00 - 16:00") {
     .replace(/\(\s*\)/g, "")
     .replace(/\[\s*\]/g, "")
     .replace(/\s{2,}/g, " ")
+    .replace(/\b(?:dari|mulai|pada|di|ke|tanggal|tgl)\s*$/i, "")
     .replace(/^[,\s;:\-\(\)\[\]]+|[,\s;:\-\(\)\[\]]+$/g, "")
     .trim();
 
