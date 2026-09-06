@@ -618,7 +618,7 @@ export function sendProfileConfirmation(botInstance, chatId) {
 /**
  * Pemilih Bulan Laporan Interaktif
  */
-export function sendReportMonthPicker(botInstance, chatId) {
+export function sendReportMonthPicker(botInstance, chatId, format = "") {
   const session = getTelegramSession(chatId);
   if (!session) {
     return botInstance.sendMessage(chatId, "⚠️ Silakan login terlebih dahulu.");
@@ -649,14 +649,15 @@ export function sendReportMonthPicker(botInstance, chatId) {
   const y4 = month <= 2 ? year - 1 : year;
 
   const pad = (n) => String(n + 1).padStart(2, "0");
+  const callbackPrefix = format ? `dl:${format}:` : "report:";
 
   const monthRows = [
-    [{ text: `📅 ${NAMA_BULAN_INDONESIA[m1]} ${year} (Bulan Ini)`, callback_data: `report:${pad(m1)}:${year}` }],
+    [{ text: `📅 ${NAMA_BULAN_INDONESIA[m1]} ${year} (Bulan Ini)`, callback_data: `${callbackPrefix}${pad(m1)}:${year}` }],
     [
-      { text: `📅 ${NAMA_BULAN_INDONESIA[m2]} ${y2}`, callback_data: `report:${pad(m2)}:${y2}` },
-      { text: `📅 ${NAMA_BULAN_INDONESIA[m3]} ${y3}`, callback_data: `report:${pad(m3)}:${y3}` }
+      { text: `📅 ${NAMA_BULAN_INDONESIA[m2]} ${y2}`, callback_data: `${callbackPrefix}${pad(m2)}:${y2}` },
+      { text: `📅 ${NAMA_BULAN_INDONESIA[m3]} ${y3}`, callback_data: `${callbackPrefix}${pad(m3)}:${y3}` }
     ],
-    [{ text: `📅 ${NAMA_BULAN_INDONESIA[m4]} ${y4}`, callback_data: `report:${pad(m4)}:${y4}` }]
+    [{ text: `📅 ${NAMA_BULAN_INDONESIA[m4]} ${y4}`, callback_data: `${callbackPrefix}${pad(m4)}:${y4}` }]
   ];
 
   const userGdrive = (session.user.gdriveLink || "").trim();
@@ -666,7 +667,7 @@ export function sendReportMonthPicker(botInstance, chatId) {
 
   if (![m1, m2, m3, m4].includes(6) || year !== 2026) {
     monthRows.push([
-      { text: `📅 Juli 2026 (Data Demo)`, callback_data: `report:07:2026` }
+      { text: `📅 Juli 2026 (Data Demo)`, callback_data: `${callbackPrefix}07:2026` }
     ]);
   }
 
@@ -682,15 +683,67 @@ export function sendReportMonthPicker(botInstance, chatId) {
     { text: `🏛 Kembali ke Menu Utama`, callback_data: "menu:main" }
   ]);
 
-  const text = `📄 *PILIH BULAN LAPORAN PDF & ZIP*\n\n` +
+  let headerTitle = "📁 *PILIH BULAN LAPORAN KINERJA*";
+  let promptDesc = "Silakan tekan tombol bulan di bawah untuk memilih format unduhan (*PDF Saja* atau *Paket ZIP*):";
+  if (format === "pdf") {
+    headerTitle = "📄 *PILIH BULAN UNDUH PDF SAJA*";
+    promptDesc = "Silakan tekan tombol bulan di bawah untuk langsung mengunduh Dokumen Laporan PDF:";
+  } else if (format === "zip") {
+    headerTitle = "📦 *PILIH BULAN UNDUH PAKET ZIP LENGKAP*";
+    promptDesc = "Silakan tekan tombol bulan di bawah untuk langsung mengunduh Paket Berkas ZIP Lengkap:";
+  }
+
+  const text = `${headerTitle}\n\n` +
     gdriveStatus +
-    `Silakan tekan salah satu tombol bulan di bawah untuk langsung mengunduh Dokumen Laporan Kinerja & Berkas Lampiran ZIP:\n\n` +
-    `_Format manual:_ \`/laporan [bulan] [tahun] [link_gdrive]\`\n` +
-    `_Contoh:_ \`/laporan Juli 2026\` atau \`/laporan Juli 2026 https://drive.google.com/...\``;
+    `${promptDesc}\n\n` +
+    `_Perintah cepat:_ \`/pdf [bulan]\` atau \`/zip [bulan]\`\n` +
+    `_Contoh:_ \`/pdf September 2026\` atau \`/zip September 2026\``;
 
   return botInstance.sendMessage(chatId, text, {
     parse_mode: "Markdown",
     reply_markup: { inline_keyboard: monthRows }
+  });
+}
+
+/**
+ * Menu Interaktif Pemilihan Format Unduhan (PDF Saja vs Paket ZIP)
+ */
+export function sendReportFormatChoice(botInstance, chatId, month, year) {
+  const session = getTelegramSession(chatId);
+  if (!session) {
+    return botInstance.sendMessage(chatId, "⚠️ Silakan login terlebih dahulu.");
+  }
+
+  const monthIdx = parseInt(month, 10) - 1;
+  const monthName = NAMA_BULAN_INDONESIA[monthIdx] || month;
+  const user = session.user;
+
+  const text = `📁 *PILIH FORMAT UNDUHAN LAPORAN*\n\n` +
+    `🗓 *Periode*: Bulan ${monthName} ${year}\n` +
+    `👤 *Pegawai*: *${user.nama}*\n` +
+    `💳 *NIP*: \`${user.nip || "-"}\`\n\n` +
+    `Silakan pilih berkas yang ingin Anda unduh:\n` +
+    `• *📄 Dokumen PDF Saja*: Laporan resmi A4 siap cetak / upload ke e-Kinerja BKN.\n` +
+    `• *📦 Paket ZIP Lengkap*: Berisi folder \`${monthName}_${year}/\` lengkap dengan file PDF + seluruh eviden bernomor runtut + \`DAFTAR_LAMPIRAN.txt\` untuk Google Drive.\n` +
+    `• *📑 Unduh Keduanya*: Mengirimkan PDF dan ZIP sekaligus.`;
+
+  const inline_keyboard = [
+    [
+      { text: "📄 Unduh PDF Saja", callback_data: `dl:pdf:${month}:${year}` },
+      { text: "📦 Unduh Paket ZIP", callback_data: `dl:zip:${month}:${year}` }
+    ],
+    [
+      { text: "📑 Unduh Keduanya (PDF & ZIP)", callback_data: `dl:both:${month}:${year}` }
+    ],
+    [
+      { text: "🔙 Pilih Bulan Lain", callback_data: "menu:laporan" },
+      { text: "🏛 Menu Utama", callback_data: "menu:main" }
+    ]
+  ];
+
+  return botInstance.sendMessage(chatId, text, {
+    parse_mode: "Markdown",
+    reply_markup: { inline_keyboard }
   });
 }
 
@@ -930,13 +983,23 @@ export async function handleCallbackQuery(botInstance, query) {
     }
   }
 
-  // D. Pemilihan Bulan Laporan (report:MM:YYYY)
+  // D. Pemilihan Bulan Laporan (report:MM:YYYY) -> Tampilkan Menu Format Unduhan (PDF Saja vs Paket ZIP)
   if (data.startsWith("report:")) {
     const parts = data.split(":");
     const month = parts[1];
     const year = parts[2] || String(new Date().getFullYear());
 
-    return handleReport(botInstance, { chat: { id: chatId } }, ["", `${month} ${year}`]);
+    return sendReportFormatChoice(botInstance, chatId, month, year);
+  }
+
+  // D2. Unduh Berdasarkan Format Spesifik (dl:format:MM:YYYY)
+  if (data.startsWith("dl:")) {
+    const parts = data.split(":");
+    const format = parts[1] || "both"; // "pdf" | "zip" | "both"
+    const month = parts[2];
+    const year = parts[3] || String(new Date().getFullYear());
+
+    return handleReport(botInstance, { chat: { id: chatId } }, ["", `${month} ${year}`], { format, direct: true });
   }
 
   // E. Pengaturan Link Google Drive Bukti Dukung (link:*)
@@ -1465,7 +1528,7 @@ export function handleJournals(botInstance, msg) {
 /**
  * Handler Perintah /laporan [bulan] [tahun] (membuat dan mengirim PDF)
  */
-export async function handleReport(botInstance, msg, match) {
+export async function handleReport(botInstance, msg, match, options = {}) {
   const chatId = msg.chat.id;
   const session = getTelegramSession(chatId);
 
@@ -1496,9 +1559,11 @@ export async function handleReport(botInstance, msg, match) {
   const rawArg = match && match[1] ? match[1].trim() : "";
   const parts = rawArg ? rawArg.split(/\s+/) : [];
 
-  // Jika tidak ada argumen, tampilkan pemilih bulan interaktif
+  const requestedFormat = options.format || ""; // "pdf" | "zip" | "both" | "ask"
+
+  // Jika tidak ada argumen bulan, tampilkan pemilih bulan interaktif
   if (parts.length === 0) {
-    return sendReportMonthPicker(botInstance, chatId);
+    return sendReportMonthPicker(botInstance, chatId, requestedFormat);
   }
 
   const now = new Date();
@@ -1529,7 +1594,12 @@ export async function handleReport(botInstance, msg, match) {
     }
   }
 
-  // Jika user menyertakan URL baru di perintah /laporan, simpan permanen ke profil user
+  // Jika dipanggil dari /laporan <bulan> tanpa flag direct dan tanpa requestedFormat spesifik (atau "ask")
+  if (!options.direct && (!requestedFormat || requestedFormat === "ask")) {
+    return sendReportFormatChoice(botInstance, chatId, targetMonth, targetYear);
+  }
+
+  // Jika user menyertakan URL baru di perintah, simpan permanen ke profil user
   let activeUser = user;
   if (urlArg) {
     try {
@@ -1545,9 +1615,17 @@ export async function handleReport(botInstance, msg, match) {
   const monthIdx = parseInt(targetMonth, 10) - 1;
   const monthName = NAMA_BULAN_INDONESIA[monthIdx] || targetMonth;
 
+  const isPdfOnly = requestedFormat === "pdf";
+  const isZipOnly = requestedFormat === "zip";
+  const isBoth = requestedFormat === "both" || (!isPdfOnly && !isZipOnly);
+
+  let statusMsg = `⏳ *Sedang menyusun Laporan Kinerja PDF & Paket ZIP...*`;
+  if (isPdfOnly) statusMsg = `⏳ *Sedang menyusun Dokumen Laporan Kinerja PDF...*`;
+  if (isZipOnly) statusMsg = `⏳ *Sedang mengemas Paket Berkas ZIP Lengkap...*`;
+
   await botInstance.sendMessage(
     chatId,
-    `⏳ *Sedang menyusun Laporan Kinerja PDF & Paket ZIP...*\n` +
+    `${statusMsg}\n` +
     `• Periode: *Bulan ${monthName} ${targetYear}*\n` +
     `• Pegawai: *${activeUser.nama}*\n` +
     (effectiveGdriveLink ? `• Link Drive: \`${effectiveGdriveLink}\`\n\n` : `• Link Drive: _(Tidak ada, footer disembunyikan)_\n\n`) +
@@ -1575,26 +1653,28 @@ export async function handleReport(botInstance, msg, match) {
       ? `🔗 *Link Google Drive Bukti Dukung:*\n\`${effectiveGdriveLink}\` (Tercantum di footer PDF)\n\n`
       : `ℹ️ _Catatan: Link Google Drive belum diatur (footer disembunyikan). Ketik /link <url> untuk memasang._\n\n`;
 
-    // 1. Kirim Laporan Utama PDF A4
-    await botInstance.sendDocument(
-      chatId,
-      pdfBuffer,
-      {
-        caption: `📄 *Laporan Bulanan Kinerja Pegawai*\n` +
-          `🗓 Periode: *${monthName} ${targetYear}*\n` +
-          `👤 Nama: *${activeUser.nama}*\n` +
-          `💳 NIP: \`${activeUser.nip || "-"}\`\n\n` +
-          gdriveCaptionNote +
-          `✅ Dokumen A4 resmi standar PermenPAN-RB No. 6 Tahun 2022 siap dicetak atau dilampirkan ke aplikasi e-Kinerja BKN.`
-      },
-      {
-        filename: pdfFileName,
-        contentType: "application/pdf"
-      }
-    );
+    // 1. Kirim Laporan Utama PDF A4 (jika diminta PDF saja atau Keduanya)
+    if (isPdfOnly || isBoth) {
+      await botInstance.sendDocument(
+        chatId,
+        pdfBuffer,
+        {
+          caption: `📄 *Laporan Bulanan Kinerja Pegawai*\n` +
+            `🗓 Periode: *${monthName} ${targetYear}*\n` +
+            `👤 Nama: *${activeUser.nama}*\n` +
+            `💳 NIP: \`${activeUser.nip || "-"}\`\n\n` +
+            gdriveCaptionNote +
+            `✅ Dokumen A4 resmi standar PermenPAN-RB No. 6 Tahun 2022 siap dicetak atau dilampirkan ke aplikasi e-Kinerja BKN.`
+        },
+        {
+          filename: pdfFileName,
+          contentType: "application/pdf"
+        }
+      );
+    }
 
-    // 2. Kirimkan juga arsip .ZIP lengkap untuk Google Drive (selalu dikirim bersama PDF)
-    if (zipBuffer) {
+    // 2. Kirim Paket Berkas ZIP (jika diminta ZIP saja atau Keduanya)
+    if ((isZipOnly || isBoth) && zipBuffer) {
       botInstance.sendChatAction(chatId, "upload_document");
       const zipCaption = attachmentCount > 0
         ? `📦 *Paket Berkas Lengkap (.ZIP) untuk Google Drive*\n` +
@@ -1621,17 +1701,47 @@ export async function handleReport(botInstance, msg, match) {
       );
     }
 
-    const reportDoneKeyboard = [
-      [
-        { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
-        { text: "📦 Unduh Bulan Lain", callback_data: "menu:laporan" }
-      ],
-      [
-        { text: effectiveGdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" },
-        { text: "🏛 Menu Utama", callback_data: "menu:main" }
-      ]
-    ];
-    await botInstance.sendMessage(chatId, `✅ *Laporan & Paket ZIP ${monthName} ${targetYear} berhasil dikirim!*`, {
+    let doneText = `✅ *Laporan & Paket ZIP ${monthName} ${targetYear} berhasil dikirim!*`;
+    let reportDoneKeyboard = [];
+
+    if (isPdfOnly) {
+      doneText = `✅ *Laporan PDF ${monthName} ${targetYear} berhasil dikirim!*`;
+      reportDoneKeyboard = [
+        [
+          { text: "📦 Unduh Paket ZIP Bulan Ini", callback_data: `dl:zip:${targetMonth}:${targetYear}` },
+          { text: "📅 Bulan Lain", callback_data: "menu:laporan" }
+        ],
+        [
+          { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
+          { text: "🏛 Menu Utama", callback_data: "menu:main" }
+        ]
+      ];
+    } else if (isZipOnly) {
+      doneText = `✅ *Paket Berkas ZIP ${monthName} ${targetYear} berhasil dikirim!*`;
+      reportDoneKeyboard = [
+        [
+          { text: "📄 Unduh PDF Saja Bulan Ini", callback_data: `dl:pdf:${targetMonth}:${targetYear}` },
+          { text: "📅 Bulan Lain", callback_data: "menu:laporan" }
+        ],
+        [
+          { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
+          { text: "🏛 Menu Utama", callback_data: "menu:main" }
+        ]
+      ];
+    } else {
+      reportDoneKeyboard = [
+        [
+          { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
+          { text: "📅 Bulan Lain", callback_data: "menu:laporan" }
+        ],
+        [
+          { text: effectiveGdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" },
+          { text: "🏛 Menu Utama", callback_data: "menu:main" }
+        ]
+      ];
+    }
+
+    await botInstance.sendMessage(chatId, doneText, {
       parse_mode: "Markdown",
       reply_markup: { inline_keyboard: reportDoneKeyboard }
     });
@@ -2319,9 +2429,21 @@ if (bot) {
   bot.onText(/^\/logout$/, (msg) => handleLogout(bot, msg));
   bot.onText(/^\/profil$/, (msg) => handleProfile(bot, msg));
   bot.onText(/^\/status$/, (msg) => handleProfile(bot, msg));
-  bot.onText(/^\/jurnal$/, (msg) => handleJournals(bot, msg));
-  bot.onText(/^\/(?:laporan|zip|unduh)(?:\s+(.*))?$/, (msg, match) => handleReport(bot, msg, match));
-  bot.onText(/^\/(?:setprofil|lengkapi)(?:\s+(.*))?$/, (msg, match) => handleSetProfile(bot, msg, match));
+  bot.onText(/^\/pdf(?:\s+(.*))?$/, (msg, match) => {
+    const rawArg = match && match[1] ? match[1].trim() : "";
+    if (!rawArg) {
+      return sendReportMonthPicker(bot, msg.chat.id, "pdf");
+    }
+    return handleReport(bot, msg, match, { format: "pdf", direct: true });
+  });
+  bot.onText(/^\/zip(?:\s+(.*))?$/, (msg, match) => {
+    const rawArg = match && match[1] ? match[1].trim() : "";
+    if (!rawArg) {
+      return sendReportMonthPicker(bot, msg.chat.id, "zip");
+    }
+    return handleReport(bot, msg, match, { format: "zip", direct: true });
+  });
+  bot.onText(/^\/(?:laporan|unduh)(?:\s+(.*))?$/, (msg, match) => handleReport(bot, msg, match, { format: "ask" }));
   bot.onText(/^\/batal$/, (msg) => handleCancel(bot, msg));
   bot.onText(/^\/(?:link|gdrive)(?:\s+(.*))?$/, (msg, match) => handleLinkCommand(bot, msg, match));
   bot.onText(/^\/(?:jam|waktu)(?:\s+(.*))?$/, (msg, match) => handleJamCommand(bot, msg, match));
