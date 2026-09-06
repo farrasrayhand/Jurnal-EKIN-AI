@@ -66,54 +66,69 @@ Hasilkan minimal 3 RHK UTAMA dan 1 RHK TAMBAHAN. Setiap RHK WAJIB memiliki 3 Asp
 Balas HANYA dengan kode JSON valid tanpa markdown backtick.
   `.trim();
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent`;
+  const candidateModels = [
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash"
+  ];
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${SYSTEM_PROMPT_SKP}\n\n${promptText}` }]
+  let lastError = null;
+  for (const model of candidateModels) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: `${SYSTEM_PROMPT_SKP}\n\n${promptText}` }]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.3
+          }
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const textOutput = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textOutput) {
+          const parsed = JSON.parse(textOutput);
+          // Pastikan setiap RHK dan aspek memiliki ID unik untuk state React
+          const formattedRhkList = (parsed.rhkList || []).map((rhk, rIdx) => ({
+            ...rhk,
+            id: `gemini-rhk-${Date.now()}-${rIdx}`,
+            aspekList: (rhk.aspekList || []).map((asp, aIdx) => ({
+              ...asp,
+              id: `gemini-asp-${Date.now()}-${rIdx}-${aIdx}`
+            }))
+          }));
+
+          return {
+            intervensiPimpinan: parsed.intervensiPimpinan || "Terwujudnya akuntabilitas dan pelayanan publik yang optimal",
+            rhkList: formattedRhkList,
+            model: model
+          };
         }
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature: 0.3
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        lastError = new Error(errorData.error?.message || `Gagal memanggil Gemini API (${model}, Status ${response.status})`);
       }
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Gagal memanggil Gemini API (Status ${response.status})`);
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  const result = await response.json();
-  const textOutput = result.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textOutput) {
-    throw new Error("Tidak ada respon teks dari Gemini AI.");
-  }
-
-  const parsed = JSON.parse(textOutput);
-  // Pastikan setiap RHK dan aspek memiliki ID unik untuk state React
-  const formattedRhkList = (parsed.rhkList || []).map((rhk, rIdx) => ({
-    ...rhk,
-    id: `gemini-rhk-${Date.now()}-${rIdx}`,
-    aspekList: (rhk.aspekList || []).map((asp, aIdx) => ({
-      ...asp,
-      id: `gemini-asp-${Date.now()}-${rIdx}-${aIdx}`
-    }))
-  }));
-
-  return {
-    intervensiPimpinan: parsed.intervensiPimpinan || "Meningkatnya kinerja dan akuntabilitas unit kerja",
-    rhkList: formattedRhkList
-  };
+  throw lastError || new Error("Tidak ada respon dari Gemini AI pada seluruh model yang tersedia.");
 }
 
 /**
@@ -564,6 +579,18 @@ export function normalizeAbbreviations(text) {
 
   // 2. Singkatan kedinasan / teknis
   s = s.replace(/\bbimtek\b/gi, "Bimbingan Teknis (Bimtek)");
+  s = s.replace(/\btka\b/gi, "Tes Kemampuan Akademik (TKA)");
+  s = s.replace(/\banbk\b/gi, "Asesmen Nasional Berbasis Komputer (ANBK)");
+  s = s.replace(/\bskp\b/gi, "Sasaran Kinerja Pegawai (SKP)");
+  s = s.replace(/\bspj\b/gi, "Surat Pertanggungjawaban (SPJ)");
+  s = s.replace(/\blpj\b/gi, "Laporan Pertanggungjawaban (LPJ)");
+  s = s.replace(/\bbmn\b/gi, "Barang Milik Negara (BMN)");
+  s = s.replace(/\bbos\b/gi, "Bantuan Operasional Sekolah (BOS)");
+  s = s.replace(/\bbku\b/gi, "Buku Kas Umum (BKU)");
+  s = s.replace(/\bkgb\b/gi, "Kenaikan Gaji Berkala (KGB)");
+  s = s.replace(/\bsop\b/gi, "Standar Operasional Prosedur (SOP)");
+  s = s.replace(/\basn\b/gi, "Aparatur Sipil Negara (ASN)");
+  s = s.replace(/\bpppk\b/gi, "Pegawai Pemerintah dengan Perjanjian Kerja (PPPK)");
   s = s.replace(/\bdinas pendidikan\b/gi, "Dinas Pendidikan");
   s = s.replace(/\bkemenag\b/gi, "Kementerian Agama");
   s = s.replace(/\bkemenkeu\b/gi, "Kementerian Keuangan");
@@ -608,8 +635,8 @@ export function polishJournalOffline(rawText, rhkList = []) {
     { prefix: "Melaksanakan pelayanan administrasi kedinasan, verifikasi kelengkapan berkas, serta pencatatan register", category: "pelayanan" },
     { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi", category: "rekap" },
-    { prefix: "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi", category: "perbaikan" },
     { prefix: "Melaksanakan penanganan kendala teknis, perbaikan perangkat, serta optimalisasi fungsi", category: "perbaikan" },
+    { prefix: "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi", category: "perbaikan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan sarana", category: "pemeliharaan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan", category: "pemeliharaan" },
     { prefix: "Menyusun draf dokumen kedinasan, telaah administrasi, serta finalisasi laporan", category: "dokumen" },
@@ -624,6 +651,7 @@ export function polishJournalOffline(rawText, rhkList = []) {
     { prefix: "Mengikuti kegiatan sosialisasi", category: "sosialisasi" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula", category: "rapat" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta pembahasan teknis", category: "rapat" },
+    { prefix: "Melaksanakan pengelolaan administrasi keuangan, verifikasi kelengkapan bukti transaksi, serta penyusunan pertanggungjawaban (SPJ)", category: "keuangan" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data", category: "rekap" },
     { prefix: "Melaksanakan pengelolaan dan pendistribusian dokumen kedinasan", category: "distribusi" },
@@ -662,16 +690,19 @@ export function polishJournalOffline(rawText, rhkList = []) {
   const isPersuratan = /\b(surat masuk|surat keluar|buku agenda|disposisi|lembar disposisi|ekspedisi surat|surat dinas|surat edaran|penomoran surat|registrasi surat|input registrasi)\b/i.test(text) || detectedCategory === "persuratan";
 
   const isSosialisasi = !isPersuratan && (detectedCategory === "sosialisasi" ||
-    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi)\b/i.test(text));
+    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi|iht|lokakarya)\b/i.test(text));
+
+  const isKeuangan = detectedCategory === "keuangan" ||
+    /\b(spj|kuitansi|kwitansi|bku|lpj keuangan|pajak|anggaran|reimburse|pencairan dana|honor|buku kas umum|pertanggungjawaban keuangan)\b/i.test(text);
 
   const isKearsipan = detectedCategory === "kearsipan" ||
     /\b(arsip|kearsipan|mengarsipkan|pengarsipan|mengarsip|ijazah|buku induk|lemari dokumen|lemari arsip|penataan berkas|simpan berkas|penyimpanan berkas|filling|map arsip)\b/i.test(text);
 
   const isRekap = detectedCategory === "rekap" ||
-    /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data)\b/i.test(text);
+    /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data|presensi|absensi|cuti)\b/i.test(text);
 
   const isPelayanan = detectedCategory === "pelayanan" ||
-    /\b(legalisir|pelayanan|buku tamu|buku register|surat keterangan|surat pindah|pelayanan siswa|layanan tamu)\b/i.test(text);
+    /\b(legalisir|pelayanan|buku tamu|buku register|surat keterangan|surat pindah|pelayanan siswa|layanan tamu|pendaftaran)\b/i.test(text);
 
   const isPerbaikan = detectedCategory === "perbaikan" ||
     /\b(benerin|perbaiki|rusak|troubleshoot|troubleshooting|error|kendala teknis|jaringan mati|wifi mati|pc mati|komputer rusak|penanganan kendala)\b/i.test(text) ||
@@ -684,7 +715,7 @@ export function polishJournalOffline(rawText, rhkList = []) {
     /\b(rapat|koordinasi|briefing|notula|rapat dinas|sidang|audiensi)\b/i.test(text);
 
   const isPembelajaran = detectedCategory === "pembelajaran" || isExplicitTeaching ||
-    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap && !isSosialisasi);
+    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap && !isSosialisasi && !isKeuangan);
 
   const isDokumen = detectedCategory === "dokumen" ||
     /\b(bikin laporan|buat laporan|susun laporan|draf|draft|penyusunan dokumen|sk pembagian tugas|jadwal kegiatan)\b/i.test(text);
@@ -705,6 +736,10 @@ export function polishJournalOffline(rawText, rhkList = []) {
     formalPrefix = "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi";
     output = "1 Berkas Pengelolaan Surat Dinas";
     catatan = "Surat kedinasan telah teragendakan dan didistribusikan secara tertib sesuai disposisi pimpinan.";
+  } else if (isKeuangan) {
+    formalPrefix = "Melaksanakan pengelolaan administrasi keuangan, verifikasi kelengkapan bukti transaksi, serta penyusunan pertanggungjawaban (SPJ)";
+    output = "1 Berkas Dokumen Pertanggungjawaban Keuangan (SPJ)";
+    catatan = "Seluruh bukti transaksi fisik dan kuitansi telah divalidasi kelengkapannya sesuai ketentuan perbendaharaan.";
   } else if (isSosialisasi) {
     formalPrefix = "Mengikuti kegiatan sosialisasi, pendalaman materi kedinasan, serta pembahasan teknis";
     output = "1 Sertifikat / Surat Tugas / Laporan Kegiatan";
@@ -752,7 +787,7 @@ export function polishJournalOffline(rawText, rhkList = []) {
     .replace(/^(tadi|hari ini|udah|sudah|lagi|sedang|mau|pengen|aku|saya|kita|kami)\s+/gi, "")
     .replace(/^(mengikuti|ngikut|ikut|hadir|menghadiri)\s+/gi, "")
     .replace(/^(ngerekap|rekap|input|menginput|penginputan|entri|mengentri)\s+/gi, "")
-    .replace(/^(arsip|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
+    .replace(/^(arsip|ngarsip|ngarsipkan|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
     .replace(/^(benerin|perbaiki|memperbaiki|beneri)\s+/gi, "")
     .replace(/^(bersihin|membersihkan|rawat|merawat)\s+/gi, "")
     .replace(/^(bikin|buat|membuat|susun|menyusun)\s+/gi, "")
@@ -787,6 +822,9 @@ export function polishJournalOffline(rawText, rhkList = []) {
     } else if (isPersuratan) {
       const topic = cleanedSubject.replace(/^(surat dinas|pengelolaan surat dinas|pengelolaan surat)\s*/gi, "").trim();
       polishedAktivitas = topic.toLowerCase().startsWith("terkait") ? `${formalPrefix} ${topic}` : `${formalPrefix} terkait ${topic}`;
+    } else if (isKeuangan) {
+      const topic = cleanedSubject.replace(/^(laporan\s+)?(spj|surat pertanggungjawaban\s*\(spj\)|lpj|laporan pertanggungjawaban\s*\(lpj\)|pengelolaan keuangan)\s*/gi, "").trim();
+      polishedAktivitas = topic ? `${formalPrefix} terkait ${topic}` : formalPrefix;
     } else if (isKearsipan && !cleanedSubject.toLowerCase().startsWith("dokumen") && !cleanedSubject.toLowerCase().startsWith("berkas")) {
       polishedAktivitas = `${formalPrefix} dokumen ${cleanedSubject}`;
     } else {

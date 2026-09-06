@@ -54,16 +54,26 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
 }
 `;
 
-      const candidateModels = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"];
+      const candidateModels = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash"
+      ];
       for (const model of candidateModels) {
         try {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 12000); // Batas timeout 12 detik
+
           const response = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-goog-api-key": effectiveKey
             },
+            signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
@@ -72,6 +82,7 @@ Kembalikan HANYA format JSON valid tanpa format markdown lain:
               }
             })
           });
+          clearTimeout(timeoutId);
 
           if (response.ok) {
             const data = await response.json();
@@ -175,6 +186,18 @@ export function normalizeAbbreviations(text) {
 
   // 2. Singkatan kedinasan / teknis
   s = s.replace(/\bbimtek\b/gi, "Bimbingan Teknis (Bimtek)");
+  s = s.replace(/\btka\b/gi, "Tes Kemampuan Akademik (TKA)");
+  s = s.replace(/\banbk\b/gi, "Asesmen Nasional Berbasis Komputer (ANBK)");
+  s = s.replace(/\bskp\b/gi, "Sasaran Kinerja Pegawai (SKP)");
+  s = s.replace(/\bspj\b/gi, "Surat Pertanggungjawaban (SPJ)");
+  s = s.replace(/\blpj\b/gi, "Laporan Pertanggungjawaban (LPJ)");
+  s = s.replace(/\bbmn\b/gi, "Barang Milik Negara (BMN)");
+  s = s.replace(/\bbos\b/gi, "Bantuan Operasional Sekolah (BOS)");
+  s = s.replace(/\bbku\b/gi, "Buku Kas Umum (BKU)");
+  s = s.replace(/\bkgb\b/gi, "Kenaikan Gaji Berkala (KGB)");
+  s = s.replace(/\bsop\b/gi, "Standar Operasional Prosedur (SOP)");
+  s = s.replace(/\basn\b/gi, "Aparatur Sipil Negara (ASN)");
+  s = s.replace(/\bpppk\b/gi, "Pegawai Pemerintah dengan Perjanjian Kerja (PPPK)");
   s = s.replace(/\bdinas pendidikan\b/gi, "Dinas Pendidikan");
   s = s.replace(/\bkemenag\b/gi, "Kementerian Agama");
   s = s.replace(/\bkemenkeu\b/gi, "Kementerian Keuangan");
@@ -219,8 +242,8 @@ export function polishJournalOfflineNode(rawText) {
     { prefix: "Melaksanakan pelayanan administrasi kedinasan, verifikasi kelengkapan berkas, serta pencatatan register", category: "pelayanan" },
     { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan verifikasi kelengkapan berkas, validasi persyaratan, serta rekapitulasi", category: "rekap" },
-    { prefix: "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi", category: "perbaikan" },
     { prefix: "Melaksanakan penanganan kendala teknis, perbaikan perangkat, serta optimalisasi fungsi", category: "perbaikan" },
+    { prefix: "Melaksanakan perbaikan teknis, penelusuran kendala (troubleshooting), dan optimalisasi fungsi", category: "perbaikan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan sarana", category: "pemeliharaan" },
     { prefix: "Melakukan pemeliharaan preventif, pembersihan berkala, serta pengecekan kelayakan", category: "pemeliharaan" },
     { prefix: "Menyusun draf dokumen kedinasan, telaah administrasi, serta finalisasi laporan", category: "dokumen" },
@@ -234,6 +257,7 @@ export function polishJournalOfflineNode(rawText) {
     { prefix: "Mengikuti kegiatan sosialisasi", category: "sosialisasi" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta penyusunan notula", category: "rapat" },
     { prefix: "Mengikuti rapat koordinasi kedinasan, penyelarasan program kerja, serta pembahasan teknis", category: "rapat" },
+    { prefix: "Melaksanakan pengelolaan administrasi keuangan, verifikasi kelengkapan bukti transaksi, serta penyusunan pertanggungjawaban (SPJ)", category: "keuangan" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data kedinasan", category: "rekap" },
     { prefix: "Melakukan penginputan, rekapitulasi, verifikasi, serta sinkronisasi data", category: "rekap" },
     { prefix: "Melaksanakan pengelolaan dan pendistribusian dokumen kedinasan", category: "distribusi" },
@@ -271,16 +295,19 @@ export function polishJournalOfflineNode(rawText) {
   const isPersuratan = /\b(surat masuk|surat keluar|buku agenda|disposisi|lembar disposisi|ekspedisi surat|surat dinas|surat edaran|penomoran surat|registrasi surat|input registrasi)\b/i.test(text) || detectedCategory === "persuratan";
 
   const isSosialisasi = !isPersuratan && (detectedCategory === "sosialisasi" ||
-    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi)\b/i.test(text));
+    /\b(sosialisasi|workshop|bimtek|pelatihan|diklat|seminar|webinar|penyuluhan|orientasi|iht|lokakarya)\b/i.test(text));
+
+  const isKeuangan = detectedCategory === "keuangan" ||
+    /\b(spj|kuitansi|kwitansi|bku|lpj keuangan|pajak|anggaran|reimburse|pencairan dana|honor|buku kas umum|pertanggungjawaban keuangan)\b/i.test(text);
 
   const isKearsipan = detectedCategory === "kearsipan" ||
     /\b(arsip|kearsipan|mengarsipkan|pengarsipan|mengarsip|ijazah|buku induk|lemari dokumen|lemari arsip|penataan berkas|simpan berkas|penyimpanan berkas|filling|map arsip)\b/i.test(text);
 
   const isRekap = detectedCategory === "rekap" ||
-    /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data)\b/i.test(text);
+    /\b(rekap|ngerekap|rekapitulasi|verifikasi berkas|validasi berkas|kenaikan pangkat|usul pangkat|gaji berkala|kgb|kepegawaian|sinkronisasi data|input data|entri data|olah data|presensi|absensi|cuti)\b/i.test(text);
 
   const isPelayanan = detectedCategory === "pelayanan" ||
-    /\b(legalisir|pelayanan|buku tamu|buku register|surat keterangan|surat pindah|pelayanan siswa|layanan tamu)\b/i.test(text);
+    /\b(legalisir|pelayanan|buku tamu|buku register|surat keterangan|surat pindah|pelayanan siswa|layanan tamu|pendaftaran)\b/i.test(text);
 
   const isPerbaikan = detectedCategory === "perbaikan" ||
     /\b(benerin|perbaiki|rusak|troubleshoot|troubleshooting|error|kendala teknis|jaringan mati|wifi mati|pc mati|komputer rusak|penanganan kendala)\b/i.test(text) ||
@@ -293,7 +320,7 @@ export function polishJournalOfflineNode(rawText) {
     /\b(rapat|koordinasi|briefing|notula|rapat dinas|sidang|audiensi)\b/i.test(text);
 
   const isPembelajaran = detectedCategory === "pembelajaran" || isExplicitTeaching ||
-    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap && !isSosialisasi);
+    (/\b(pembelajaran|materi ajar|praktik siswa|bimbingan siswa)\b/i.test(text) && !isKearsipan && !isPersuratan && !isRekap && !isSosialisasi && !isKeuangan);
 
   const isDokumen = detectedCategory === "dokumen" ||
     /\b(bikin laporan|buat laporan|susun laporan|draf|draft|penyusunan dokumen|sk pembagian tugas|jadwal kegiatan)\b/i.test(text);
@@ -314,6 +341,10 @@ export function polishJournalOfflineNode(rawText) {
     formalPrefix = "Melaksanakan pengelolaan surat dinas, pencatatan buku agenda, serta pendistribusian lembar disposisi";
     output = "1 Berkas Pengelolaan Surat Dinas";
     catatan = "Surat kedinasan telah teragendakan dan didistribusikan secara tertib sesuai disposisi pimpinan.";
+  } else if (isKeuangan) {
+    formalPrefix = "Melaksanakan pengelolaan administrasi keuangan, verifikasi kelengkapan bukti transaksi, serta penyusunan pertanggungjawaban (SPJ)";
+    output = "1 Berkas Dokumen Pertanggungjawaban Keuangan (SPJ)";
+    catatan = "Seluruh bukti transaksi fisik dan kuitansi telah divalidasi kelengkapannya sesuai ketentuan perbendaharaan.";
   } else if (isSosialisasi) {
     formalPrefix = "Mengikuti kegiatan sosialisasi, pendalaman materi kedinasan, serta pembahasan teknis";
     output = "1 Sertifikat / Surat Tugas / Laporan Kegiatan";
@@ -361,7 +392,7 @@ export function polishJournalOfflineNode(rawText) {
     .replace(/^(tadi|hari ini|udah|sudah|lagi|sedang|mau|pengen|aku|saya|kita|kami)\s+/gi, "")
     .replace(/^(mengikuti|ngikut|ikut|hadir|menghadiri)\s+/gi, "")
     .replace(/^(ngerekap|rekap|input|menginput|penginputan|entri|mengentri)\s+/gi, "")
-    .replace(/^(arsip|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
+    .replace(/^(arsip|ngarsip|ngarsipkan|mengarsip|mengarsipkan|pengarsipan|simpan|menyimpan|tata|menata|merapikan|rapikan|masukin|taruh)\s+/gi, "")
     .replace(/^(benerin|perbaiki|memperbaiki|beneri)\s+/gi, "")
     .replace(/^(bersihin|membersihkan|rawat|merawat)\s+/gi, "")
     .replace(/^(bikin|buat|membuat|susun|menyusun)\s+/gi, "")
@@ -394,6 +425,9 @@ export function polishJournalOfflineNode(rawText) {
     } else if (isPersuratan) {
       const topic = cleaned.replace(/^(surat dinas|pengelolaan surat dinas|pengelolaan surat)\s*/gi, "").trim();
       polished = topic.toLowerCase().startsWith("terkait") ? `${formalPrefix} ${topic}` : `${formalPrefix} terkait ${topic}`;
+    } else if (isKeuangan) {
+      const topic = cleaned.replace(/^(laporan\s+)?(spj|surat pertanggungjawaban\s*\(spj\)|lpj|laporan pertanggungjawaban\s*\(lpj\)|pengelolaan keuangan)\s*/gi, "").trim();
+      polished = topic ? `${formalPrefix} terkait ${topic}` : formalPrefix;
     } else if (isKearsipan && !cleaned.toLowerCase().startsWith("dokumen") && !cleaned.toLowerCase().startsWith("berkas")) {
       polished = `${formalPrefix} dokumen ${cleaned}`;
     } else {

@@ -2802,7 +2802,19 @@ async function handleIncomingAttachment(botInstance, msg, item) {
 
     try {
       const photos = msg.photo || [];
+      if (photos.length === 0) return;
       const bestPhoto = photos[photos.length - 1];
+
+      // Validasi batas ukuran berkas Telegram Bot API (20 MB)
+      if (bestPhoto.file_size && bestPhoto.file_size > 20 * 1024 * 1024) {
+        return bot.sendMessage(
+          chatId,
+          `⚠️ *Ukuran Foto Terlalu Besar*: ${(bestPhoto.file_size / (1024 * 1024)).toFixed(1)} MB.\n` +
+          `Telegram Bot API membatasi unduhan berkas maksimal 20 MB. Silakan perkecil resolusi foto atau sertakan tautan Google Drive pada pesan Anda.`,
+          { parse_mode: "Markdown" }
+        );
+      }
+
       let savedFilePath = "";
 
       const now = new Date();
@@ -2874,6 +2886,18 @@ async function handleIncomingAttachment(botInstance, msg, item) {
 
     try {
       const doc = msg.document;
+      if (!doc) return;
+
+      // Validasi batas ukuran berkas Telegram Bot API (20 MB)
+      if (doc.file_size && doc.file_size > 20 * 1024 * 1024) {
+        return bot.sendMessage(
+          chatId,
+          `⚠️ *Ukuran Dokumen Terlalu Besar*: ${(doc.file_size / (1024 * 1024)).toFixed(1)} MB.\n` +
+          `Telegram Bot API membatasi unduhan berkas maksimal 20 MB. Silakan kompres berkas atau sertakan tautan Google Drive pada pesan Anda.`,
+          { parse_mode: "Markdown" }
+        );
+      }
+
       const now = new Date();
       const INDO_MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
       const monthTag = `${INDO_MONTHS[now.getMonth()]}_${now.getFullYear()}`;
