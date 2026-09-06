@@ -304,8 +304,23 @@ export function generateMonthlyReportPdf({
 
           const textHeight = doc.heightOfString(fullUraian, { width: colW[2] - 10 });
           const totalAttCount = (jrn.allAtts || []).length;
+          const photoAtt = (jrn.allAtts || []).find(a => a.type === "photo") || (jrn.att?.type === "photo" ? jrn.att : null);
+          const docAtt = (jrn.allAtts || []).find(a => a.type !== "photo");
+          const hasLink = Boolean(jrn.linkUrl);
+          const hasRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fileName);
+
+          const col5W = colW[4] - 6;
+          let col5H = 0;
+          doc.fontSize(6);
+          if (totalAttCount > 0 || hasRef) {
+            const rawFileName = photoAtt?.fileName || docAtt?.fileName || jrn.trackableName || jrn.fileName || "berkas";
+            col5H = doc.heightOfString(rawFileName, { width: col5W }) + 18;
+          } else if (hasLink) {
+            col5H = doc.heightOfString(jrn.linkUrl, { width: col5W }) + 10;
+          }
+
           const minHeight = 36;
-          const rowH = Math.max(minHeight, textHeight + 14);
+          const rowH = Math.max(minHeight, textHeight + 14, col5H);
 
           if (tableY + rowH > 730) {
             doc.addPage();
@@ -359,56 +374,43 @@ export function generateMonthlyReportPdf({
           // PENTING: Jangan gunakan doc.y setelah ini — gunakan posisi Y eksplisit
           // agar teks rapi dan simetris di tengah baris tabel
           const col5X = tableLeft + colW[0] + colW[1] + colW[2] + colW[3] + 3;
-          const col5W = colW[4] - 6;
-          const col5MidY = tableY + Math.floor(rowH / 2);
 
-          const photoAtt = (jrn.allAtts || []).find(a => a.type === "photo") || (jrn.att?.type === "photo" ? jrn.att : null);
-          const docAtt = (jrn.allAtts || []).find(a => a.type !== "photo");
-
-          if (totalAttCount > 0) {
-            // ── Ada lampiran berkas/foto fisik terupload ──
-            // Sembunyikan foto thumbnail saat unduh/cetak sesuai instruksi user,
-            // dan tampilkan label lampiran + nama berkas terunggah sebagai teks resmi tanpa link.
-            const rawFileName = (photoAtt?.fileName || docAtt?.fileName || jrn.trackableName || jrn.fileName || "berkas").replace(/^Foto_/, "");
-            const displayFileName = rawFileName.length > 28 ? rawFileName.slice(0, 25) + "..." : rawFileName;
+          if (totalAttCount > 0 || hasRef) {
+            // ── Berkas fisik terunggah (Foto / Dokumen) ──
+            // Tampilkan label lampiran + nama berkas LENGKAP tanpa terpotong
+            const rawFileName = photoAtt?.fileName || docAtt?.fileName || jrn.trackableName || jrn.fileName || "berkas";
             const lampLabel = jrn.lampiranLabel || (jrn.lampiranIndex > 0 ? `Lampiran ${jrn.lampiranIndex}` : "Lampiran");
 
-            const startY = col5MidY - 9;
-            doc.fillColor("#1e3a5f").font("Times-Bold").fontSize(7.5);
-            doc.text(lampLabel, col5X, startY, { width: col5W, align: "center", lineBreak: false });
+            doc.font("Times-Roman").fontSize(6);
+            const nameHeight = doc.heightOfString(rawFileName, { width: col5W });
+            const blockHeight = 11 + nameHeight;
+            const startY = tableY + Math.max(4, Math.floor((rowH - blockHeight) / 2));
 
-            doc.fillColor("#475569").font("Times-Roman").fontSize(6);
-            doc.text(displayFileName, col5X, startY + 10, { width: col5W, align: "center", lineBreak: false });
+            doc.fillColor("#1e3a5f").font("Times-Bold").fontSize(7.5);
+            doc.text(lampLabel, col5X, startY, { width: col5W, align: "center" });
+
+            doc.fillColor("#334155").font("Times-Roman").fontSize(6);
+            doc.text(rawFileName, col5X, startY + 11, { width: col5W, align: "center" });
+
+          } else if (hasLink) {
+            // ── Tautan online (Google Drive, dll.) ──
+            // Tulis link lengkap dan aktif bisa diklik
+            doc.font("Times-Roman").fontSize(6);
+            const linkHeight = doc.heightOfString(jrn.linkUrl, { width: col5W });
+            const startY = tableY + Math.max(4, Math.floor((rowH - linkHeight) / 2));
+
+            doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(6);
+            doc.text(jrn.linkUrl, col5X, startY, {
+              width: col5W,
+              align: "center",
+              link: jrn.linkUrl,
+              underline: true
+            });
 
           } else {
-            // ── Tidak ada berkas fisik terupload ──
-            const hasLink = Boolean(jrn.linkUrl);
-            const hasRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fileName);
-
-            if (hasLink) {
-              // Tautan online / Google Drive — link aktif warna biru bisa diklik
-              const linkY = col5MidY - 5;
-              doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(7);
-              doc.text("Lihat Tautan Bukti", col5X, linkY, {
-                width: col5W, align: "center", lineBreak: false,
-                link: jrn.linkUrl, underline: true
-              });
-
-            } else if (hasRef) {
-              const rawRefName = (jrn.fileName || path.basename((jrn.fileUrl || jrn.filePath || "").split("?")[0]) || "Lampiran").replace(/^Foto_/, "");
-              const displayRefName = rawRefName.length > 28 ? rawRefName.slice(0, 25) + "..." : rawRefName;
-              const startY = col5MidY - 9;
-
-              doc.fillColor("#1e3a5f").font("Times-Bold").fontSize(7.5);
-              doc.text("Lampiran", col5X, startY, { width: col5W, align: "center", lineBreak: false });
-
-              doc.fillColor("#475569").font("Times-Roman").fontSize(6);
-              doc.text(displayRefName, col5X, startY + 10, { width: col5W, align: "center", lineBreak: false });
-
-            } else {
-              doc.fillColor("#94a3b8").font("Times-Italic").fontSize(8);
-              doc.text("-", col5X, col5MidY - 4, { width: col5W, align: "center", lineBreak: false });
-            }
+            // ── Tidak ada lampiran maupun link ──
+            doc.fillColor("#94a3b8").font("Times-Italic").fontSize(8);
+            doc.text("-", col5X, tableY + Math.floor(rowH / 2) - 4, { width: col5W, align: "center" });
           }
 
           tableY += rowH;

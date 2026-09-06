@@ -792,14 +792,14 @@ export default function MonthlyReportGenerator({
                             <a 
                               href={jrn.effectiveFotoUrl}
                               target="_blank" rel="noreferrer"
-                              style={{ fontSize: "7pt", color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "inline-block", wordBreak: "break-word", maxWidth: "120px" }}
+                              style={{ fontSize: "7pt", color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "inline-block", wordBreak: "break-all" }}
                               title="Klik untuk membuka foto resolusi penuh"
                             >
                               {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
                             </a>
                           </div>
                           {/* Cetak: hanya nama file sebagai teks biasa — tanpa thumbnail, tanpa link */}
-                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-word" }}>
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-all" }}>
                             {jrn.lampiranIndex > 0 && <span style={{ fontWeight: "bold", color: "#1e3a5f" }}>Lampiran {jrn.lampiranIndex}: </span>}
                             <span>{jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}</span>
                           </div>
@@ -817,14 +817,14 @@ export default function MonthlyReportGenerator({
                             <a 
                               href={jrn.fileUrl || (jrn.filePath ? `/uploads/${jrn.filePath.split(/[/\\]/).pop()}` : `/uploads/${jrn.fileName}`)}
                               target="_blank" rel="noreferrer"
-                              style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "block", wordBreak: "break-word" }}
+                              style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "block", wordBreak: "break-all" }}
                               title={jrn.fileName || "Buka Berkas"}
                             >
                               {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
                             </a>
                           </div>
                           {/* Cetak: hanya nama file sebagai teks biasa — tanpa link */}
-                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-word" }}>
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-all" }}>
                             {jrn.lampiranIndex > 0 && <span style={{ fontWeight: "bold", color: "#1e3a5f" }}>Lampiran {jrn.lampiranIndex}: </span>}
                             <span>{jrn.fileName || jrn.trackableName || "Berkas Lampiran"}</span>
                           </div>
@@ -838,7 +838,7 @@ export default function MonthlyReportGenerator({
                             style={{ 
                               color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold",
                               display: "inline-block", wordBreak: "break-all",
-                              maxWidth: "130px", fontSize: "6.8pt"
+                              fontSize: "6.8pt"
                             }}
                           >
                             {jrn.linkUrl}
