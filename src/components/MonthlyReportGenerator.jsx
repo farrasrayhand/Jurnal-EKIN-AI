@@ -753,86 +753,73 @@ export default function MonthlyReportGenerator({
                       {/* ── 1. File Upload (Foto) ── */}
                       {jrn.effectiveFotoUrl ? (
                         <div>
-                          {/* Thumbnail foto — hanya muncul di preview web, disembunyikan saat cetak */}
-                          <div className="preview-only-link" style={{ marginBottom: "3px" }}>
+                          {/* Preview web: thumbnail + label + link nama file */}
+                          <div className="preview-only-link">
                             <img 
                               src={jrn.effectiveFotoUrl} 
                               alt={`Foto kegiatan ${idx + 1}`} 
                               style={{ 
-                                width: "85px", 
-                                height: "58px", 
-                                objectFit: "cover", 
-                                borderRadius: "2px", 
-                                border: "1px solid #000000",
-                                display: "block",
-                                margin: "0 auto 2px auto"
+                                width: "85px", height: "58px", objectFit: "cover", 
+                                borderRadius: "2px", border: "1px solid #000000",
+                                display: "block", margin: "0 auto 2px auto"
                               }} 
-                              onError={(e) => { 
-                                e.target.style.display = 'none'; 
-                              }}
+                              onError={(e) => { e.target.style.display = 'none'; }}
                             />
+                            {jrn.lampiranIndex > 0 && (
+                              <div style={{ fontSize: "6.8pt", fontWeight: "bold", color: "#1e40af", margin: "2px 0" }}>
+                                📎 Lampiran {jrn.lampiranIndex}
+                              </div>
+                            )}
+                            <a 
+                              href={jrn.effectiveFotoUrl}
+                              target="_blank" rel="noreferrer"
+                              style={{ fontSize: "7pt", color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "inline-block", wordBreak: "break-word", maxWidth: "120px" }}
+                              title="Klik untuk membuka foto resolusi penuh"
+                            >
+                              {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
+                            </a>
                           </div>
-                          {jrn.lampiranIndex > 0 && (
-                            <div style={{ fontSize: "6.8pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
-                              📎 Lampiran {jrn.lampiranIndex}
-                            </div>
-                          )}
-                          {/* Preview web: nama file sebagai link yang bisa diklik */}
-                          <a 
-                            href={jrn.effectiveFotoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="preview-only-link"
-                            style={{ fontSize: "7pt", color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "inline-block", wordBreak: "break-word", maxWidth: "120px" }}
-                            title="Klik untuk membuka foto resolusi penuh"
-                          >
-                            {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
-                          </a>
-                          {/* Cetak: hanya nama file sebagai teks biasa */}
+                          {/* Cetak: hanya nama file sebagai teks biasa — tanpa thumbnail, tanpa link */}
                           <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000", wordBreak: "break-word" }}>
-                            📷 {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
+                            {jrn.lampiranIndex > 0 && <span>📎 Lamp.{jrn.lampiranIndex} — </span>}
+                            {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
                           </div>
                         </div>
                       ) : (jrn.hasPhysical && (jrn.fileName || jrn.fileUrl || jrn.filePath)) ? (
                         /* ── 2. File Upload Non-foto (PDF, Docx, dsb.) ── */
                         <div style={{ fontSize: "7.5pt", color: "#334155" }}>
-                          {jrn.lampiranIndex > 0 && (
-                            <div style={{ fontSize: "7pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
-                              📎 Lampiran {jrn.lampiranIndex}
-                            </div>
-                          )}
-                          {/* Preview web: nama file sebagai link yang bisa diklik */}
-                          <a 
-                            href={jrn.fileUrl || (jrn.filePath ? `/uploads/${jrn.filePath.split(/[/\\]/).pop()}` : `/uploads/${jrn.fileName}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="preview-only-link"
-                            style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "block", wordBreak: "break-word" }}
-                            title={jrn.fileName || "Buka Berkas"}
-                          >
-                            📄 {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
-                          </a>
-                          {/* Cetak: hanya nama file sebagai teks biasa */}
+                          {/* Preview web: label + link nama file */}
+                          <div className="preview-only-link">
+                            {jrn.lampiranIndex > 0 && (
+                              <div style={{ fontSize: "7pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
+                                📎 Lampiran {jrn.lampiranIndex}
+                              </div>
+                            )}
+                            <a 
+                              href={jrn.fileUrl || (jrn.filePath ? `/uploads/${jrn.filePath.split(/[/\\]/).pop()}` : `/uploads/${jrn.fileName}`)}
+                              target="_blank" rel="noreferrer"
+                              style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "block", wordBreak: "break-word" }}
+                              title={jrn.fileName || "Buka Berkas"}
+                            >
+                              📄 {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
+                            </a>
+                          </div>
+                          {/* Cetak: hanya nama file sebagai teks biasa — tanpa link */}
                           <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000", wordBreak: "break-word" }}>
-                            📄 {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
+                            {jrn.lampiranIndex > 0 && <span>📎 Lamp.{jrn.lampiranIndex} — </span>}
+                            {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
                           </div>
                         </div>
                       ) : (jrn.linkUrl && !jrn.hasPhysical) ? (
-                        /* ── 3. Tautan Online/Drive (bukan file upload) ── */
-                        /* Tautan TETAP tampil sebagai link di preview DAN saat cetak */
+                        /* ── 3. Tautan Online/Drive — TETAP tampil saat cetak (bisa diklik) ── */
                         <div style={{ fontSize: "7.5pt" }}>
                           <a 
                             href={jrn.linkUrl} 
-                            target="_blank" 
-                            rel="noreferrer" 
+                            target="_blank" rel="noreferrer"
                             style={{ 
-                              color: "#1d4ed8", 
-                              textDecoration: "underline", 
-                              fontWeight: "bold",
-                              display: "inline-block",
-                              wordBreak: "break-all",
-                              maxWidth: "130px",
-                              fontSize: "6.8pt"
+                              color: "#1d4ed8", textDecoration: "underline", fontWeight: "bold",
+                              display: "inline-block", wordBreak: "break-all",
+                              maxWidth: "130px", fontSize: "6.8pt"
                             }}
                           >
                             🔗 {jrn.linkUrl}
@@ -842,6 +829,7 @@ export default function MonthlyReportGenerator({
                         <span style={{ fontSize: "7.5pt", color: "#64748b", fontStyle: "italic" }}>Log Kegiatan</span>
                       )}
                     </td>
+
 
                   </tr>
                 ))}
