@@ -995,20 +995,37 @@ const server = http.createServer(async (req, res) => {
     const month = parsedUrl.searchParams.get("month") || "07";
     const year = parsedUrl.searchParams.get("year") || "2026";
     const userId = parsedUrl.searchParams.get("userId") || "";
+    const sessionToken = parsedUrl.searchParams.get("token") || (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
     const gdriveLink = parsedUrl.searchParams.get("gdriveLink") || "";
 
     // Gunakan getStore() yang sudah di-cache (MySQL-aware) agar data akun selalu akurat
     const liveAccounts = getAccounts();
     const liveJournals = getJournals();
 
-    const targetUser = (userId
-      ? (liveAccounts.find(a => a.id === userId || a.username === userId))
-      : null)
-      || liveAccounts.find(a => a.role !== "superadmin")
-      || liveAccounts[0]
-      || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
+    // Prioritas identifikasi user:
+    // 1. Session token (paling akurat — langsung dari sesi login aktif)
+    // 2. userId parameter (sebagai fallback)
+    // 3. Akun non-superadmin pertama
+    let targetUser = null;
+    if (sessionToken) {
+      const session = getWebSession(sessionToken);
+      if (session && session.user) {
+        const sessionUserId = session.user.id || session.user.username;
+        targetUser = liveAccounts.find(a => a.id === sessionUserId || a.username === sessionUserId)
+          || liveAccounts.find(a => a.id === session.user.id)
+          || null;
+      }
+    }
+    if (!targetUser && userId) {
+      targetUser = liveAccounts.find(a => a.id === userId || a.username === userId) || null;
+    }
+    if (!targetUser) {
+      targetUser = liveAccounts.find(a => a.role !== "superadmin")
+        || liveAccounts[0]
+        || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
+    }
 
-    const userJournals = liveJournals.filter(j => !userId || j.userId === targetUser.id || j.userId === targetUser.username);
+    const userJournals = liveJournals.filter(j => j.userId === targetUser.id || j.userId === targetUser.username);
 
     if (pathname === "/api/reports/pdf") {
       generateMonthlyReportPdf({

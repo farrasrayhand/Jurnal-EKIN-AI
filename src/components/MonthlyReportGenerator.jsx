@@ -174,10 +174,18 @@ export default function MonthlyReportGenerator({
   const handleDownloadPdfDirect = async () => {
     setIsDownloadingPdf(true);
     try {
+      // Ambil session token agar server dapat mengidentifikasi user yang login
+      let sessionToken = "";
+      try {
+        const rawSession = localStorage.getItem("ekinerja_auth_session");
+        if (rawSession) sessionToken = JSON.parse(rawSession)?.token || "";
+      } catch (e) {}
+
       const query = new URLSearchParams({
         month: selectedMonth,
         year: selectedYear,
         userId: pegawai?.id || "",
+        token: sessionToken,
         gdriveLink: gdriveLink || ""
       });
 
@@ -223,10 +231,18 @@ export default function MonthlyReportGenerator({
   const handleDownloadZip = async () => {
     setIsDownloadingZip(true);
     try {
+      // Ambil session token agar server dapat mengidentifikasi user yang login
+      let sessionToken = "";
+      try {
+        const rawSession = localStorage.getItem("ekinerja_auth_session");
+        if (rawSession) sessionToken = JSON.parse(rawSession)?.token || "";
+      } catch (e) {}
+
       const query = new URLSearchParams({
         month: selectedMonth,
         year: selectedYear,
         userId: pegawai?.id || "",
+        token: sessionToken,
         gdriveLink: gdriveLink || ""
       });
 
