@@ -30,7 +30,8 @@ import {
   validateRegistrationCode,
   registerNewUser,
   getStore,
-  saveStore
+  saveStore,
+  deleteJournalById
 } from "./dbStore.js";
 import { polishJournalNode } from "./aiServiceNode.js";
 import { generateMonthlyReportPdf, generateMonthlyReportZip } from "./pdfGenerator.js";
@@ -1002,6 +1003,33 @@ export async function handleCallbackQuery(botInstance, query) {
     return handleReport(botInstance, { chat: { id: chatId } }, ["", `${month} ${year}`], { format, direct: true });
   }
 
+  // D3. Hapus Kegiatan Jurnal Tertentu (jrn:del:ID)
+  if (data.startsWith("jrn:del:")) {
+    const journalId = data.replace("jrn:del:", "").trim();
+    const result = deleteJournalById(journalId, true);
+    if (!result.success) {
+      return botInstance.sendMessage(chatId, `⚠️ ${result.message || "Gagal menghapus jurnal."}`);
+    }
+
+    const delMsg = `🗑 *Aktivitas Jurnal Berhasil Dihapus Bersih!* ✅\n\n` +
+      `• *Database*: Catatan logbook telah dihapus permanen.\n` +
+      (result.deletedFiles > 0
+        ? `• *Penyimpanan Server*: *${result.deletedFiles} berkas fisik lampiran/foto* telah dibersihkan tuntas tanpa menyisakan sampah.\n\n`
+        : `• *Penyimpanan Server*: Bersih (tidak ada berkas lokal tersisa).\n\n`) +
+      `_Tabel laporan dan paket ZIP Anda kini telah otomatis disinkronkan._`;
+
+    return botInstance.sendMessage(chatId, delMsg, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "📋 Lihat Jurnal Tersisa", callback_data: "menu:jurnal" }],
+          [{ text: "📝 Catat Aktivitas Baru", callback_data: "menu:catat" }],
+          [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+        ]
+      }
+    });
+  }
+
   // E. Pengaturan Link Google Drive Bukti Dukung (link:*)
   if (data.startsWith("link:")) {
     if (!session) {
@@ -1507,21 +1535,94 @@ export function handleJournals(botInstance, msg) {
       `\n`;
   });
 
-  text += `💡 Klik tombol di bawah untuk mencetak laporan resmi atau kembali ke menu.`;
+  text += `💡 _Untuk menghapus jurnal yang salah atau keliru, tekan tombol Hapus di bawah:_\n`;
 
-  const inline_keyboard = [
-    [
-      { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
-      { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
-    ],
-    [
-      { text: "🏛 Menu Utama", callback_data: "menu:main" }
-    ]
-  ];
+  const inline_keyboard = [];
+
+  // Baris tombol hapus per nomor jurnal (misal: [ 🗑 Hapus #1 ] [ 🗑 Hapus #2 ] ...)
+  const deleteButtons = recent.map((j, idx) => ({
+    text: `🗑 Hapus #${idx + 1}`,
+    callback_data: `jrn:del:${j.id}`
+  }));
+
+  for (let i = 0; i < deleteButtons.length; i += 3) {
+    inline_keyboard.push(deleteButtons.slice(i, i + 3));
+  }
+
+  inline_keyboard.push([
+    { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
+    { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
+  ]);
+  inline_keyboard.push([
+    { text: "🏛 Menu Utama", callback_data: "menu:main" }
+  ]);
 
   return botInstance.sendMessage(chatId, text, {
     parse_mode: "Markdown",
     reply_markup: { inline_keyboard }
+  });
+}
+
+/**
+ * Handler Perintah /hapus atau /hapusjurnal
+ */
+export function handleHapusCommand(botInstance, msg, match) {
+  const chatId = msg.chat.id;
+  const session = getTelegramSession(chatId);
+  if (!session) {
+    return botInstance.sendMessage(chatId, "⚠️ Silakan login terlebih dahulu.");
+  }
+
+  const rawArg = match && match[1] ? match[1].trim() : "";
+  if (rawArg) {
+    const result = deleteJournalById(rawArg, true);
+    if (!result.success) {
+      return botInstance.sendMessage(chatId, `⚠️ ${result.message}`);
+    }
+    return botInstance.sendMessage(
+      chatId,
+      `🗑 *Kegiatan Jurnal Berhasil Dihapus!* ✅\n\n` +
+      `Data di database dan ${result.deletedFiles} berkas fisik di server telah dibersihkan tanpa meninggalkan sampah.`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📋 Lihat Jurnal Tersisa", callback_data: "menu:jurnal" }],
+            [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
+          ]
+        }
+      }
+    );
+  }
+
+  const journals = getJournals(session.userId);
+  if (journals.length === 0) {
+    return botInstance.sendMessage(chatId, "📝 Belum ada jurnal yang tersimpan untuk dihapus.");
+  }
+
+  const recent = journals.slice(0, 5);
+  let text = `🗑 *PILIH JURNAL YANG INGIN DIHAPUS PERMANEN*\n\n` +
+    `_Menghapus jurnal akan sekaligus membersihkan seluruh berkas fisik lampiran di server:_\n\n`;
+
+  recent.forEach((j, idx) => {
+    text += `${idx + 1}. 📅 *${j.tanggal || "-"}* (${j.jam || "-"})\n` +
+      `   *Uraian*: ${j.aktivitas.slice(0, 75)}...\n\n`;
+  });
+
+  const buttons = recent.map((j, idx) => ({
+    text: `🗑 Hapus #${idx + 1}`,
+    callback_data: `jrn:del:${j.id}`
+  }));
+
+  const keyboard = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    keyboard.push(buttons.slice(i, i + 2));
+  }
+  keyboard.push([{ text: "❌ Batal", callback_data: "menu:main" }]);
+
+  return botInstance.sendMessage(chatId, text, {
+    parse_mode: "Markdown",
+    reply_markup: { inline_keyboard: keyboard }
   });
 }
 
@@ -2207,6 +2308,9 @@ export async function handleIncomingText(botInstance, msg) {
         { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
       ],
       [
+        { text: "🗑 Batal / Hapus Jurnal Ini", callback_data: `jrn:del:${newEntry.id}` }
+      ],
+      [
         { text: "🏛 Menu Utama", callback_data: "menu:main" }
       ]
     ];
@@ -2429,6 +2533,8 @@ if (bot) {
   bot.onText(/^\/logout$/, (msg) => handleLogout(bot, msg));
   bot.onText(/^\/profil$/, (msg) => handleProfile(bot, msg));
   bot.onText(/^\/status$/, (msg) => handleProfile(bot, msg));
+  bot.onText(/^\/jurnal$/, (msg) => handleJournals(bot, msg));
+  bot.onText(/^\/(?:hapus|hapusjurnal|del)(?:\s+(.*))?$/, (msg, match) => handleHapusCommand(bot, msg, match));
   bot.onText(/^\/pdf(?:\s+(.*))?$/, (msg, match) => {
     const rawArg = match && match[1] ? match[1].trim() : "";
     if (!rawArg) {
@@ -2504,9 +2610,25 @@ async function processMediaGroup(botInstance, mgId) {
       `📝 *Uraian Tugas Formal*:\n_${polished.aktivitas}_\n\n` +
       `📊 *Output*: ${polished.outputJumlah}\n` +
       `🖼 *Bukti Lampiran*: *${items.length} Berkas* terunggah ke logbook.\n\n` +
-      `Ketik \`/laporan\` kapan pun untuk mengunduh laporan PDF & paket berkas ZIP lengkap.`;
+      `Silakan pilih menu di bawah atau ketik aktivitas lainnya:`;
 
-    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+    const albumDoneKeyboard = [
+      [
+        { text: "📝 Catat Lagi", callback_data: "menu:catat" },
+        { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
+      ],
+      [
+        { text: "🗑 Batal / Hapus Jurnal Ini", callback_data: `jrn:del:${newEntry.id}` }
+      ],
+      [
+        { text: "🏛 Menu Utama", callback_data: "menu:main" }
+      ]
+    ];
+
+    return botInstance.sendMessage(chatId, reply, {
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: albumDoneKeyboard }
+    });
   }
 
   // Kasus B: Album dikirim TANPA caption
@@ -2611,8 +2733,25 @@ async function handleIncomingAttachment(botInstance, msg, item) {
       reply += `🔗 *Tautan Drive*: ${detectedUrl}\n`;
     }
 
-    reply += `\nKetik \`/laporan\` kapan pun untuk mengunduh laporan PDF bulanan Anda.`;
-    return botInstance.sendMessage(chatId, reply, { parse_mode: "Markdown" });
+    reply += `\nSilakan pilih menu di bawah atau ketik aktivitas lainnya:`;
+
+    const fileDoneKeyboard = [
+      [
+        { text: "📝 Catat Lagi", callback_data: "menu:catat" },
+        { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
+      ],
+      [
+        { text: "🗑 Batal / Hapus Jurnal Ini", callback_data: `jrn:del:${newEntry.id}` }
+      ],
+      [
+        { text: "🏛 Menu Utama", callback_data: "menu:main" }
+      ]
+    ];
+
+    return botInstance.sendMessage(chatId, reply, {
+      parse_mode: "Markdown",
+      reply_markup: { inline_keyboard: fileDoneKeyboard }
+    });
   }
 
   // 3. Berkas tunggal TANPA caption
