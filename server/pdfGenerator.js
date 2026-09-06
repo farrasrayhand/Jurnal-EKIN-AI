@@ -367,6 +367,12 @@ export function generateMonthlyReportPdf({
               const labelY = renderedThumb ? tableY + 36 : tableY + 8;
               doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7);
               doc.text(`📎 ${jrn.lampiranLabel}`, col5X, labelY, { width: col5W, align: "center" });
+              // Tampilkan nama file foto di bawah label
+              const photoFileName = (photoAtt.fileName || jrn.trackableName || "").slice(0, 22);
+              if (photoFileName) {
+                doc.fillColor("#475569").font("Times-Roman").fontSize(6);
+                doc.text(photoFileName, col5X, doc.y + 1, { width: col5W, align: "center" });
+              }
             } else {
               doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7.5);
               doc.text(`📎 ${jrn.lampiranLabel}`, col5X, tableY + 6, { width: col5W, align: "center" });
@@ -374,6 +380,7 @@ export function generateMonthlyReportPdf({
               doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
               doc.text(shortTrackName, col5X, doc.y + 2, { width: col5W, align: "center" });
             }
+
           } else {
             const hasCustomLink = Boolean(jrn.linkUrl);
             const hasFileRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fotoPath || jrn.fileName ||
