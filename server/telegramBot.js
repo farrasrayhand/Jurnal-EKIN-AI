@@ -342,7 +342,7 @@ export function sendMainMenu(botInstance, chatId, user) {
       { text: "📋 5 Jurnal Terakhir", callback_data: "menu:jurnal" }
     ],
     [
-      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
+      { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" },
       { text: "⏰ Jam Default Kerja", callback_data: "menu:jam" }
     ],
     [
@@ -892,7 +892,7 @@ export async function handleCallbackQuery(botInstance, query) {
         const inline_keyboard = [
           [
             { text: "📝 Mulai Catat Aktivitas", callback_data: "menu:catat" },
-            { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }
+            { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
           ],
           [
             { text: "🏛 Menu Utama", callback_data: "menu:main" }
@@ -968,7 +968,7 @@ export async function handleCallbackQuery(botInstance, query) {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+              [{ text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }],
               [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
             ]
           }
@@ -1233,7 +1233,7 @@ export function handleSetProfile(botInstance, msg, match) {
       const inline_keyboard = [
         [
           { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
-          { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }
+          { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
         ],
         [
           { text: "🏛 Menu Utama", callback_data: "menu:main" }
@@ -1371,7 +1371,7 @@ export function handleProfile(botInstance, msg) {
       { text: user.gdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" }
     ],
     [
-      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
+      { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" },
       { text: "🏛 Menu Utama", callback_data: "menu:main" }
     ]
   ];
@@ -1428,7 +1428,7 @@ export function handleJournals(botInstance, msg) {
   const inline_keyboard = [
     [
       { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
-      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }
+      { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
     ],
     [
       { text: "🏛 Menu Utama", callback_data: "menu:main" }
@@ -1526,7 +1526,7 @@ export async function handleReport(botInstance, msg, match) {
 
   await botInstance.sendMessage(
     chatId,
-    `⏳ *Sedang menyusun Laporan Kinerja PDF...*\n` +
+    `⏳ *Sedang menyusun Laporan Kinerja PDF & Paket ZIP...*\n` +
     `• Periode: *Bulan ${monthName} ${targetYear}*\n` +
     `• Pegawai: *${activeUser.nama}*\n` +
     (effectiveGdriveLink ? `• Link Drive: \`${effectiveGdriveLink}\`\n\n` : `• Link Drive: _(Tidak ada, footer disembunyikan)_\n\n`) +
@@ -1572,18 +1572,26 @@ export async function handleReport(botInstance, msg, match) {
       }
     );
 
-    // 2. Jika ada berkas lampiran fisik terupload, kirimkan juga arsip .ZIP lengkap untuk Google Drive
-    if (attachmentCount > 0) {
+    // 2. Kirimkan juga arsip .ZIP lengkap untuk Google Drive (selalu dikirim bersama PDF)
+    if (zipBuffer) {
       botInstance.sendChatAction(chatId, "upload_document");
+      const zipCaption = attachmentCount > 0
+        ? `📦 *Paket Berkas Lengkap (.ZIP) untuk Google Drive*\n` +
+          `• Folder Utama: \`${monthName}_${targetYear}/\`\n` +
+          `• Berisi: Dokumen PDF + *${attachmentCount} berkas lampiran eviden* terunggah\n` +
+          `• Seluruh berkas dinomori runtut (\`lampiran-1\`, \`lampiran-2\`, dst.) sesuai tabel PDF\n` +
+          `• Dilengkapi indeks panduan \`DAFTAR_LAMPIRAN.txt\`\n\n` +
+          `🚀 _Tinggal ekstrak atau unggah folder ini langsung ke Google Drive bukti dukung Anda!_`
+        : `📦 *Paket Berkas Lengkap (.ZIP) untuk Google Drive*\n` +
+          `• Folder Utama: \`${monthName}_${targetYear}/\`\n` +
+          `• Berisi: Dokumen Laporan PDF + Indeks \`DAFTAR_LAMPIRAN.txt\`\n\n` +
+          `🚀 _Folder terstruktur rapi, siap pakai untuk Google Drive bukti dukung Anda!_`;
+
       await botInstance.sendDocument(
         chatId,
         zipBuffer,
         {
-          caption: `📦 *Paket Berkas Lengkap (.ZIP) untuk Google Drive*\n` +
-            `• Berisi Laporan PDF + *${attachmentCount} berkas lampiran eviden* terunggah\n` +
-            `• Seluruh berkas telah dinomori secara runtut (\`lampiran-1\`, \`lampiran-2\`, dst.) sesuai tabel laporan PDF\n` +
-            `• Dilengkapi indeks panduan \`DAFTAR_LAMPIRAN.txt\`\n\n` +
-            `🚀 _Tinggal unggah file ZIP ini langsung ke Google Drive bukti dukung Anda!_`
+          caption: zipCaption
         },
         {
           filename: zipFileName,
@@ -1595,14 +1603,14 @@ export async function handleReport(botInstance, msg, match) {
     const reportDoneKeyboard = [
       [
         { text: "📝 Catat Aktivitas", callback_data: "menu:catat" },
-        { text: "📄 Unduh Bulan Lain", callback_data: "menu:laporan" }
+        { text: "📦 Unduh Bulan Lain", callback_data: "menu:laporan" }
       ],
       [
         { text: effectiveGdriveLink ? "🔗 Ubah Link Google Drive" : "🔗 Atur Link Google Drive", callback_data: "link:prompt" },
         { text: "🏛 Menu Utama", callback_data: "menu:main" }
       ]
     ];
-    await botInstance.sendMessage(chatId, `✅ *Laporan ${monthName} ${targetYear} berhasil dikirim!*`, {
+    await botInstance.sendMessage(chatId, `✅ *Laporan & Paket ZIP ${monthName} ${targetYear} berhasil dikirim!*`, {
       parse_mode: "Markdown",
       reply_markup: { inline_keyboard: reportDoneKeyboard }
     });
@@ -1829,7 +1837,7 @@ export async function handleIncomingText(botInstance, msg) {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+              [{ text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }],
               [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
             ]
           }
@@ -2065,7 +2073,7 @@ export async function handleIncomingText(botInstance, msg) {
     const journalDoneKeyboard = [
       [
         { text: "📝 Catat Lagi", callback_data: "menu:catat" },
-        { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }
+        { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }
       ],
       [
         { text: "🏛 Menu Utama", callback_data: "menu:main" }
@@ -2115,7 +2123,7 @@ export function handleLinkCommand(botInstance, msg, match) {
         parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" }],
+            [{ text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }],
             [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
           ]
         }
@@ -2160,12 +2168,12 @@ export function handleLinkCommand(botInstance, msg, match) {
       `📌 *Dampak Pengaturan:*\n` +
       `1. Tautan ini otomatis tercantum aktif pada *Catatan Kaki (Footer)* dokumen resmi Laporan Kinerja PDF bulanan Anda sebagai bukti dukung digital BKN.\n` +
       `2. Tautan juga dilampirkan pada indeks pendukung berkas bukti dukung digital.\n\n` +
-      `_Silakan unduh dokumen laporan PDF Anda melalui tombol di bawah:_`,
+      `_Silakan unduh dokumen laporan PDF & paket ZIP Anda melalui tombol di bawah:_`,
       {
         parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "📄 Unduh Laporan PDF Sekarang", callback_data: "menu:laporan" }],
+            [{ text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" }],
             [{ text: "🏛 Menu Utama", callback_data: "menu:main" }]
           ]
         }
@@ -2189,7 +2197,7 @@ export function handleLinkCommand(botInstance, msg, match) {
       ...(currentLink ? [{ text: "🗑 Hapus Link", callback_data: "link:clear" }] : [])
     ],
     [
-      { text: "📄 Unduh Laporan PDF", callback_data: "menu:laporan" },
+      { text: "📦 Unduh Laporan (PDF & ZIP)", callback_data: "menu:laporan" },
       { text: "🏛 Menu Utama", callback_data: "menu:main" }
     ]
   ];
@@ -2291,7 +2299,7 @@ if (bot) {
   bot.onText(/^\/profil$/, (msg) => handleProfile(bot, msg));
   bot.onText(/^\/status$/, (msg) => handleProfile(bot, msg));
   bot.onText(/^\/jurnal$/, (msg) => handleJournals(bot, msg));
-  bot.onText(/^\/laporan(?:\s+(.*))?$/, (msg, match) => handleReport(bot, msg, match));
+  bot.onText(/^\/(?:laporan|zip|unduh)(?:\s+(.*))?$/, (msg, match) => handleReport(bot, msg, match));
   bot.onText(/^\/(?:setprofil|lengkapi)(?:\s+(.*))?$/, (msg, match) => handleSetProfile(bot, msg, match));
   bot.onText(/^\/batal$/, (msg) => handleCancel(bot, msg));
   bot.onText(/^\/(?:link|gdrive)(?:\s+(.*))?$/, (msg, match) => handleLinkCommand(bot, msg, match));
