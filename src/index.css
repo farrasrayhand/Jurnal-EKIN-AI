@@ -1076,16 +1076,18 @@ select optgroup, .select-field optgroup, .form-select optgroup {
 }
 
 @media print {
-  body {
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 10pt !important;
     font-family: 'Times New Roman', Times, serif !important;
     margin: 0 !important;
     padding: 0 !important;
+    overflow: visible !important;
+    height: auto !important;
   }
 
-  /* Sembunyikan semua elemen UI — hanya sheet yang dicetak */
+  /* Sembunyikan semua elemen UI aplikasi agar browser cepat memproses layout print */
   .no-print,
   .app-header,
   .ai-generator-box,
@@ -1094,13 +1096,17 @@ select optgroup, .select-field optgroup, .form-select optgroup {
   .btn,
   .modal-overlay,
   .preview-only-link,
-  /* Sembunyikan kontrol & wrapper di sekitar sheet */
   .month-nav-bar,
   .report-controls,
   .download-buttons,
   .narasi-section,
-  .tabs-content > *:not(:has(#monthly-report-sheet)),
   nav, header, footer, aside {
+    display: none !important;
+  }
+
+  /* Jika mode cetak aktif, sembunyikan seluruh kontainer lain */
+  body.is-printing-report .page-content > *:not(.tabs-content),
+  body.is-printing-report .tabs-content > *:not(:has(#monthly-report-sheet)) {
     display: none !important;
   }
 
@@ -1113,8 +1119,8 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     content: none !important;
   }
 
-  /* Reset semua wrapper container */
-  body > *, .app-container, .app-main, .tabs-content, .page-content, main {
+  /* Reset semua wrapper container agar browser tidak menghitung scrollbars */
+  body > *, #root, .app-container, .app-main, .tabs-content, .page-content, main {
     background: transparent !important;
     box-shadow: none !important;
     border: none !important;
@@ -1122,6 +1128,10 @@ select optgroup, .select-field optgroup, .form-select optgroup {
     padding: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    contain: none !important;
   }
 
 

@@ -223,14 +223,20 @@ export default function MonthlyReportGenerator({
   };
 
   const handlePrint = () => {
+    document.body.classList.add("is-printing-report");
     const origTitle = document.title;
     const monthName = currentMonthData.monthObj.name;
     const cleanName = (pegawai?.nama || "Pegawai").replace(/[^a-zA-Z0-9]/g, "_");
     document.title = `Laporan_Kinerja_${monthName}_${selectedYear}_${cleanName}`;
-    window.print();
+    
+    // Beri jeda kecil agar browser merender style print sebelum memicu dialog print
     setTimeout(() => {
-      document.title = origTitle;
-    }, 1200);
+      window.print();
+      document.body.classList.remove("is-printing-report");
+      setTimeout(() => {
+        document.title = origTitle;
+      }, 800);
+    }, 50);
   };
 
   // Handler Download Paket Arsip ZIP (Laporan PDF + Seluruh Berkas Lampiran Terunggah)
