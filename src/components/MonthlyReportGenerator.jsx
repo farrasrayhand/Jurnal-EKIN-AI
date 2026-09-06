@@ -780,7 +780,7 @@ export default function MonthlyReportGenerator({
                             />
                             {jrn.lampiranIndex > 0 && (
                               <div style={{ fontSize: "6.8pt", fontWeight: "bold", color: "#1e40af", margin: "2px 0" }}>
-                                📎 Lampiran {jrn.lampiranIndex}
+                                Lampiran {jrn.lampiranIndex}
                               </div>
                             )}
                             <a 
@@ -793,9 +793,9 @@ export default function MonthlyReportGenerator({
                             </a>
                           </div>
                           {/* Cetak: hanya nama file sebagai teks biasa — tanpa thumbnail, tanpa link */}
-                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000", wordBreak: "break-word" }}>
-                            {jrn.lampiranIndex > 0 && <span>📎 Lamp.{jrn.lampiranIndex} — </span>}
-                            {jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-word" }}>
+                            {jrn.lampiranIndex > 0 && <span style={{ fontWeight: "bold", color: "#1e3a5f" }}>Lampiran {jrn.lampiranIndex}: </span>}
+                            <span>{jrn.fileName || jrn.trackableName || "Foto Dokumentasi"}</span>
                           </div>
                         </div>
                       ) : (jrn.hasPhysical && (jrn.fileName || jrn.fileUrl || jrn.filePath)) ? (
@@ -805,7 +805,7 @@ export default function MonthlyReportGenerator({
                           <div className="preview-only-link">
                             {jrn.lampiranIndex > 0 && (
                               <div style={{ fontSize: "7pt", fontWeight: "bold", color: "#1e40af", marginBottom: "2px" }}>
-                                📎 Lampiran {jrn.lampiranIndex}
+                                Lampiran {jrn.lampiranIndex}
                               </div>
                             )}
                             <a 
@@ -814,13 +814,13 @@ export default function MonthlyReportGenerator({
                               style={{ color: "#1d4ed8", textDecoration: "underline", fontWeight: "600", display: "block", wordBreak: "break-word" }}
                               title={jrn.fileName || "Buka Berkas"}
                             >
-                              📄 {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
+                              {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
                             </a>
                           </div>
                           {/* Cetak: hanya nama file sebagai teks biasa — tanpa link */}
-                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", fontWeight: "bold", color: "#000000", wordBreak: "break-word" }}>
-                            {jrn.lampiranIndex > 0 && <span>📎 Lamp.{jrn.lampiranIndex} — </span>}
-                            {jrn.fileName || jrn.trackableName || "Berkas Lampiran"}
+                          <div className="print-only-text" style={{ display: "none", fontSize: "7pt", color: "#000000", wordBreak: "break-word" }}>
+                            {jrn.lampiranIndex > 0 && <span style={{ fontWeight: "bold", color: "#1e3a5f" }}>Lampiran {jrn.lampiranIndex}: </span>}
+                            <span>{jrn.fileName || jrn.trackableName || "Berkas Lampiran"}</span>
                           </div>
                         </div>
                       ) : (jrn.linkUrl && !jrn.hasPhysical) ? (
@@ -835,11 +835,11 @@ export default function MonthlyReportGenerator({
                               maxWidth: "130px", fontSize: "6.8pt"
                             }}
                           >
-                            🔗 {jrn.linkUrl}
+                            {jrn.linkUrl}
                           </a>
                         </div>
                       ) : (!jrn.effectiveFotoUrl && !jrn.fileName && !jrn.fileUrl && !jrn.filePath && !jrn.linkUrl) && (
-                        <span style={{ fontSize: "7.5pt", color: "#64748b", fontStyle: "italic" }}>Log Kegiatan</span>
+                        <span style={{ fontSize: "7.5pt", color: "#64748b", fontStyle: "italic" }}>-</span>
                       )}
                     </td>
 

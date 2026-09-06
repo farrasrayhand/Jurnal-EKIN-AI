@@ -304,10 +304,8 @@ export function generateMonthlyReportPdf({
 
           const textHeight = doc.heightOfString(fullUraian, { width: colW[2] - 10 });
           const totalAttCount = (jrn.allAtts || []).length;
-          const hasPhoto = (jrn.allAtts || []).some(a => a.type === "photo");
-          const hasDocFile = (jrn.allAtts || []).some(a => a.type !== "photo");
-          const minHeight = hasPhoto ? 64 : (hasDocFile ? 50 : 42);
-          const rowH = Math.max(minHeight, textHeight + 16);
+          const minHeight = 36;
+          const rowH = Math.max(minHeight, textHeight + 14);
 
           if (tableY + rowH > 730) {
             doc.addPage();
@@ -357,60 +355,62 @@ export function generateMonthlyReportPdf({
           doc.fillColor("#000000").font("Times-Roman").fontSize(8);
           doc.text(jrn.outputJumlah || "1 Dokumen", tableLeft + colW[0] + colW[1] + colW[2] + 4, tableY + 6, { width: colW[3] - 8, align: "center" });
 
-          const col5X = tableLeft + colW[0] + colW[1] + colW[2] + colW[3] + 4;
-          const col5W = colW[4] - 8;
+          // ── Kolom 5: Bukti Eviden / Lampiran ──────────────────────────────
+          // PENTING: Jangan gunakan doc.y setelah ini — gunakan posisi Y eksplisit
+          // agar teks rapi dan simetris di tengah baris tabel
+          const col5X = tableLeft + colW[0] + colW[1] + colW[2] + colW[3] + 3;
+          const col5W = colW[4] - 6;
+          const col5MidY = tableY + Math.floor(rowH / 2);
 
-          const totalAttCount = (jrn.allAtts || []).length;
           const photoAtt = (jrn.allAtts || []).find(a => a.type === "photo") || (jrn.att?.type === "photo" ? jrn.att : null);
+          const docAtt = (jrn.allAtts || []).find(a => a.type !== "photo");
 
           if (totalAttCount > 0) {
-            if (photoAtt) {
-              const imgSource = photoAtt.filePath || (photoAtt.base64Data ? Buffer.from(photoAtt.base64Data, "base64") : null);
-              let renderedThumb = false;
-              if (imgSource) {
-                try { doc.image(imgSource, col5X + 3, tableY + 4, { fit: [col5W - 6, 30], align: "center", valign: "center" }); renderedThumb = true; } catch (e) { renderedThumb = false; }
-              }
-              const labelY = renderedThumb ? tableY + 36 : tableY + 8;
-              doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7);
-              doc.text(`📎 ${jrn.lampiranLabel}`, col5X, labelY, { width: col5W, align: "center" });
-              // Tampilkan nama file foto di bawah label
-              const photoFileName = (photoAtt.fileName || jrn.trackableName || "").slice(0, 22);
-              if (photoFileName) {
-                doc.fillColor("#475569").font("Times-Roman").fontSize(6);
-                doc.text(photoFileName, col5X, doc.y + 1, { width: col5W, align: "center" });
-              }
-            } else {
-              doc.fillColor("#0f172a").font("Times-Bold").fontSize(totalAttCount > 1 ? 6.5 : 7.5);
-              doc.text(`📎 ${jrn.lampiranLabel}`, col5X, tableY + 6, { width: col5W, align: "center" });
-              const shortTrackName = (jrn.trackableName || jrn.allAtts[0]?.fileName || jrn.fileName || "berkas.pdf").slice(0, 24);
-              doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
-              doc.text(shortTrackName, col5X, doc.y + 2, { width: col5W, align: "center" });
-            }
+            // ── Ada lampiran berkas/foto fisik terupload ──
+            // Sembunyikan foto thumbnail saat unduh/cetak sesuai instruksi user,
+            // dan tampilkan label lampiran + nama berkas terunggah sebagai teks resmi tanpa link.
+            const rawFileName = (photoAtt?.fileName || docAtt?.fileName || jrn.trackableName || jrn.fileName || "berkas").replace(/^Foto_/, "");
+            const displayFileName = rawFileName.length > 28 ? rawFileName.slice(0, 25) + "..." : rawFileName;
+            const lampLabel = jrn.lampiranLabel || (jrn.lampiranIndex > 0 ? `Lampiran ${jrn.lampiranIndex}` : "Lampiran");
+
+            const startY = col5MidY - 9;
+            doc.fillColor("#1e3a5f").font("Times-Bold").fontSize(7.5);
+            doc.text(lampLabel, col5X, startY, { width: col5W, align: "center", lineBreak: false });
+
+            doc.fillColor("#475569").font("Times-Roman").fontSize(6);
+            doc.text(displayFileName, col5X, startY + 10, { width: col5W, align: "center", lineBreak: false });
 
           } else {
-            const hasCustomLink = Boolean(jrn.linkUrl);
-            const hasFileRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fotoPath || jrn.fileName ||
-              (Array.isArray(jrn.attachments) && jrn.attachments.length > 0));
-            if (hasCustomLink) {
+            // ── Tidak ada berkas fisik terupload ──
+            const hasLink = Boolean(jrn.linkUrl);
+            const hasRef = Boolean(jrn.fileUrl || jrn.filePath || jrn.fileName);
+
+            if (hasLink) {
+              // Tautan online / Google Drive — link aktif warna biru bisa diklik
+              const linkY = col5MidY - 5;
               doc.fillColor("#1d4ed8").font("Times-Roman").fontSize(7);
-              doc.text("🔗 Tautan Bukti Eviden", col5X, tableY + 6, {
-                width: col5W, align: "center",
-                link: jrn.linkUrl,
-                underline: true
+              doc.text("Lihat Tautan Bukti", col5X, linkY, {
+                width: col5W, align: "center", lineBreak: false,
+                link: jrn.linkUrl, underline: true
               });
-            } else if (hasFileRef) {
-              const rawRef = jrn.fileUrl || jrn.filePath || jrn.fotoPath || "";
-              const displayName = (jrn.fileName || (rawRef ? path.basename(rawRef.split("?")[0]) : ""))
-                || "Lampiran Terlampir";
-              doc.fillColor("#0f172a").font("Times-Bold").fontSize(7);
-              doc.text("📎 Lampiran", col5X, tableY + 6, { width: col5W, align: "center" });
-              doc.fillColor("#475569").font("Times-Roman").fontSize(6.5);
-              doc.text(displayName.slice(0, 24), col5X, doc.y + 2, { width: col5W, align: "center" });
+
+            } else if (hasRef) {
+              const rawRefName = (jrn.fileName || path.basename((jrn.fileUrl || jrn.filePath || "").split("?")[0]) || "Lampiran").replace(/^Foto_/, "");
+              const displayRefName = rawRefName.length > 28 ? rawRefName.slice(0, 25) + "..." : rawRefName;
+              const startY = col5MidY - 9;
+
+              doc.fillColor("#1e3a5f").font("Times-Bold").fontSize(7.5);
+              doc.text("Lampiran", col5X, startY, { width: col5W, align: "center", lineBreak: false });
+
+              doc.fillColor("#475569").font("Times-Roman").fontSize(6);
+              doc.text(displayRefName, col5X, startY + 10, { width: col5W, align: "center", lineBreak: false });
+
             } else {
-              doc.fillColor("#94a3b8").font("Times-Italic").fontSize(7);
-              doc.text("-", col5X, tableY + 8, { width: col5W, align: "center" });
+              doc.fillColor("#94a3b8").font("Times-Italic").fontSize(8);
+              doc.text("-", col5X, col5MidY - 4, { width: col5W, align: "center", lineBreak: false });
             }
           }
+
           tableY += rowH;
         });
       }
