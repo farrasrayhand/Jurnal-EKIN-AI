@@ -174,17 +174,23 @@ export default function MonthlyReportGenerator({
   const handleDownloadPdfDirect = async () => {
     setIsDownloadingPdf(true);
     try {
-      // Ambil session token agar server dapat mengidentifikasi user yang login
+      // Ambil session token & username dari localStorage agar server bisa identifikasi user yang login
       let sessionToken = "";
+      let sessionUsername = "";
       try {
         const rawSession = localStorage.getItem("ekinerja_auth_session");
-        if (rawSession) sessionToken = JSON.parse(rawSession)?.token || "";
+        if (rawSession) {
+          const parsed = JSON.parse(rawSession);
+          sessionToken = parsed?.token || "";
+          sessionUsername = parsed?.user?.username || parsed?.user?.id || "";
+        }
       } catch (e) {}
 
       const query = new URLSearchParams({
         month: selectedMonth,
         year: selectedYear,
         userId: pegawai?.id || "",
+        username: sessionUsername,
         token: sessionToken,
         gdriveLink: gdriveLink || ""
       });
@@ -231,17 +237,23 @@ export default function MonthlyReportGenerator({
   const handleDownloadZip = async () => {
     setIsDownloadingZip(true);
     try {
-      // Ambil session token agar server dapat mengidentifikasi user yang login
+      // Ambil session token & username dari localStorage agar server bisa identifikasi user yang login
       let sessionToken = "";
+      let sessionUsername = "";
       try {
         const rawSession = localStorage.getItem("ekinerja_auth_session");
-        if (rawSession) sessionToken = JSON.parse(rawSession)?.token || "";
+        if (rawSession) {
+          const parsed = JSON.parse(rawSession);
+          sessionToken = parsed?.token || "";
+          sessionUsername = parsed?.user?.username || parsed?.user?.id || "";
+        }
       } catch (e) {}
 
       const query = new URLSearchParams({
         month: selectedMonth,
         year: selectedYear,
         userId: pegawai?.id || "",
+        username: sessionUsername,
         token: sessionToken,
         gdriveLink: gdriveLink || ""
       });

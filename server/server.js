@@ -995,6 +995,7 @@ const server = http.createServer(async (req, res) => {
     const month = parsedUrl.searchParams.get("month") || "07";
     const year = parsedUrl.searchParams.get("year") || "2026";
     const userId = parsedUrl.searchParams.get("userId") || "";
+    const username = parsedUrl.searchParams.get("username") || "";
     const sessionToken = parsedUrl.searchParams.get("token") || (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
     const gdriveLink = parsedUrl.searchParams.get("gdriveLink") || "";
 
@@ -1002,24 +1003,39 @@ const server = http.createServer(async (req, res) => {
     const liveAccounts = getAccounts();
     const liveJournals = getJournals();
 
-    // Prioritas identifikasi user:
-    // 1. Session token (paling akurat — langsung dari sesi login aktif)
-    // 2. userId parameter (sebagai fallback)
-    // 3. Akun non-superadmin pertama
+    // Prioritas identifikasi user (dari yang paling reliable):
+    // 1. username param — langsung dari session localStorage, konsisten di semua mode
+    // 2. session token — lookup via server session store
+    // 3. userId param — sebagai fallback terakhir
+    // 4. Akun non-superadmin pertama (last resort)
     let targetUser = null;
-    if (sessionToken) {
+
+    // 1. Username (paling reliable)
+    if (username) {
+      targetUser = liveAccounts.find(a => a.username === username || a.id === username) || null;
+      if (targetUser) console.log(`[PDF/ZIP] User ditemukan via username: ${targetUser.nama}`);
+    }
+
+    // 2. Session token
+    if (!targetUser && sessionToken) {
       const session = getWebSession(sessionToken);
       if (session && session.user) {
         const sessionUserId = session.user.id || session.user.username;
-        targetUser = liveAccounts.find(a => a.id === sessionUserId || a.username === sessionUserId)
-          || liveAccounts.find(a => a.id === session.user.id)
-          || null;
+        const sessionUserName = session.user.username || session.user.id;
+        targetUser = liveAccounts.find(a => a.username === sessionUserName || a.id === sessionUserId) || null;
+        if (targetUser) console.log(`[PDF/ZIP] User ditemukan via session token: ${targetUser.nama}`);
       }
     }
+
+    // 3. userId param
     if (!targetUser && userId) {
       targetUser = liveAccounts.find(a => a.id === userId || a.username === userId) || null;
+      if (targetUser) console.log(`[PDF/ZIP] User ditemukan via userId: ${targetUser.nama}`);
     }
+
+    // 4. Last resort: akun non-superadmin pertama
     if (!targetUser) {
+      console.warn(`[PDF/ZIP] ⚠️ User tidak ditemukan (username="${username}", userId="${userId}") — fallback ke akun pertama`);
       targetUser = liveAccounts.find(a => a.role !== "superadmin")
         || liveAccounts[0]
         || { nama: "Pegawai E-Kinerja", nip: "200011192025211007", pangkat: "Pengatur Muda / II/a", jabatan: "Staff", unitKerja: "Instansi" };
